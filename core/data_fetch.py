@@ -56,5 +56,3 @@ def fetch_news(ticker, days_back=NEWS_DAYS_BACK, translate_to_es=True):
 def translate_text(text, target_lang="es"):
     # Placeholder: reemplazar con API real de traducción si se desea
     return text
-
-
