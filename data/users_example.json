@@ -1,14 +1,14 @@
 [
   {
     "username": "admin",
-    "password_hash": "",
+    "password_hash": "$2b$12$OeM4tIU5NR6gSsv2r3ZOP.JzTBIgE0ZaxmHqtOtUru8BC6F1uF1dy",
     "role": "admin",
     "email": "admin@example.com"
   },
   {
-    "username": "demo",
-    "password_hash": "",
+    "username": "manu",
+    "password_hash": "$2b$12$NV72AmYL3L5Cv5m4Jwl3COBeQxt26es7W4eaAMs2EHj96sQQeDC3a",
     "role": "user",
-    "email": "demo@example.com"
+    "email": "manu@example.com"
   }
 ]
