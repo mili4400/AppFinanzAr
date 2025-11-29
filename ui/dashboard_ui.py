@@ -1,25 +1,76 @@
 # ui/dashboard_ui.py
 import streamlit as st
-import pandas as pd
 import plotly.graph_objects as go
-from core.data_fetch import fetch_fundamentals, fetch_news
-from core.utils import sma, ema, rsi
+from core.data_fetch import fetch_ohlc, fetch_fundamentals, fetch_news
+from core.utils import sma, ema, rsi, load_json, save_json
+import os
+import pandas as pd
+
+FAV_PATH = os.path.join("data", "favorites.json")
 
 def show_dashboard():
-    st.title("📈 AppFinanzAr — Dashboard")
-    ticker = st.text_input("Ingrese ticker (ej: MELI.US)", "MELI.US", key="dashboard_ticker")
+    st.image("assets/logo_finanzapp.svg", width=150)  # Logo arriba
+    st.title("AppFinanzAr - Dashboard")
+    ticker = st.text_input("Ingrese ticker (ej: MELI.US)", "MELI.US", key="dash_ticker")
+
+    # Sidebar favoritos
+    if not os.path.exists(FAV_PATH):
+        save_json(FAV_PATH, [])
+    favorites = load_json(FAV_PATH, [])
+    if st.sidebar.button("Agregar a Favoritos") and ticker.upper() not in favorites:
+        favorites.append(ticker.upper())
+        save_json(FAV_PATH, favorites)
+        st.success(f"{ticker.upper()} agregado a Favoritos")
+    st.sidebar.write("### Favoritos")
+    for f in favorites:
+        st.sidebar.write(f"- {f}")
+
+    # Fechas
+    today = pd.Timestamp.today().date()
+    start_date = st.sidebar.date_input("Fecha inicio", today - pd.Timedelta(days=30))
+    end_date = st.sidebar.date_input("Fecha fin", today)
+
+    # SMA/EMA/RSI
+    sma_short = st.sidebar.number_input("SMA corto", value=20)
+    sma_long = st.sidebar.number_input("SMA largo", value=50)
+    ema_span = st.sidebar.number_input("EMA", value=20)
+    rsi_period = st.sidebar.number_input("RSI periodo", value=14)
 
     if ticker:
-        fundamentals, competitors = fetch_fundamentals(ticker)
-        news = fetch_news(ticker, days_back=60)
+        df = fetch_ohlc(ticker, from_date=start_date, to_date=end_date)
+        if df.empty:
+            st.error("No se encontraron datos históricos.")
+            return
+
+        df["SMA_short"] = sma(df["close"], sma_short)
+        df["SMA_long"] = sma(df["close"], sma_long)
+        df["EMA"] = ema(df["close"], ema_span)
+        df["RSI"] = rsi(df["close"], rsi_period)
+
+        # Candlestick
+        fig = go.Figure(data=[go.Candlestick(
+            x=df["date"], open=df["open"], high=df["high"], low=df["low"], close=df["close"]
+        )])
+        fig.add_trace(go.Scatter(x=df["date"], y=df["SMA_short"], mode="lines", name=f"SMA {sma_short}"))
+        fig.add_trace(go.Scatter(x=df["date"], y=df["SMA_long"], mode="lines", name=f"SMA {sma_long}"))
+        fig.add_trace(go.Scatter(x=df["date"], y=df["EMA"], mode="lines", name=f"EMA {ema_span}"))
+        fig.update_layout(template="plotly_dark", height=600)
+        st.plotly_chart(fig, use_container_width=True)
+
+        # RSI
+        rsi_fig = go.Figure()
+        rsi_fig.add_trace(go.Scatter(x=df["date"], y=df["RSI"], name="RSI"))
+        rsi_fig.update_layout(template="plotly_dark", height=200)
+        st.plotly_chart(rsi_fig, use_container_width=True)
 
         # Fundamentales
+        fundamentals, competitors = fetch_fundamentals(ticker)
         st.subheader("Fundamentales clave")
         if fundamentals:
             df_f = pd.DataFrame.from_dict(fundamentals, orient="index", columns=["Valor"])
             st.dataframe(df_f)
         else:
-            st.info("No se encontraron datos fundamentales.")
+            st.info("No se encontraron fundamentales.")
 
         # Competidores
         st.subheader("Competidores")
@@ -30,10 +81,9 @@ def show_dashboard():
 
         # Noticias
         st.subheader("Noticias recientes")
-        if news:
-            for n in news[:10]:
-                title = n.get("title", "Sin título")
-                date = n.get("published_at", n.get("date", ""))
-                st.write(f"- {title} ({date})")
+        news_items = fetch_news(ticker)
+        if news_items:
+            for n in news_items[:10]:
+                st.write(f"- {n.get('title')} ({n.get('published_at')})")
         else:
-            st.info("No se encontraron noticias recientes.")
+            st.info("No se encontraron noticias.")
