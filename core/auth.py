@@ -1,10 +1,11 @@
 # core/auth.py
 import json
-import os
 import hashlib
 import streamlit as st
+import os
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "users_example.json")
+# Usar ruta relativa al working directory de Streamlit
+DATA_PATH = os.path.join("data", "users_example.json")
 
 class AuthManager:
     def __init__(self):
@@ -14,9 +15,10 @@ class AuthManager:
         try:
             with open(DATA_PATH, "r", encoding="utf-8") as f:
                 users = json.load(f)
+            # Convertir a dict por username para acceso rápido
             return {u["username"]: u for u in users}
         except Exception as e:
-            print("[ERROR] No se pudo leer users_example.json:", e)
+            st.error(f"[ERROR] No se pudo leer users_example.json: {e}")
             return {}
 
     def hash_password(self, pwd: str) -> str:
@@ -29,6 +31,22 @@ class AuthManager:
         entered_hash = self.hash_password(password)
         return stored_hash == entered_hash
 
+    def create_user(self, username, password, role="user", email=""):
+        new_user = {
+            "username": username,
+            "password_hash": self.hash_password(password),
+            "role": role,
+            "email": email
+        }
+        data = list(self.users.values())
+        data.append(new_user)
+        with open(DATA_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+        self.users[username] = new_user
+
+# ----------------------------
+# Streamlit session helpers
+# ----------------------------
 def init_session():
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
@@ -40,9 +58,7 @@ def login_user(username, password):
     if auth.login(username, password):
         st.session_state["logged_in"] = True
         st.session_state["username"] = username
-        st.success(f"Bienvenido {username}")
-        st.experimental_rerun()  # recarga la página
+        st.experimental_rerun()
     else:
         st.error("Usuario o contraseña incorrectos")
-
 
