@@ -10,8 +10,6 @@ from datetime import datetime, timedelta
 FAV_PATH = os.path.join("data", "favorites.json")
 
 def show_dashboard():
-    # Logo y título
-    st.image("assets/logo_finanzapp.svg", width=150)
     st.title("AppFinanzAr - Dashboard")
 
     ticker = st.text_input("Ingrese ticker (ej: MELI.US)", "MELI.US", key="dash_ticker")
