@@ -5,6 +5,7 @@ from core.data_fetch import fetch_ohlc, fetch_fundamentals, fetch_news
 from core.utils import sma, ema, rsi, load_json, save_json
 import os
 import pandas as pd
+from datetime import datetime, timedelta
 
 FAV_PATH = os.path.join("data", "favorites.json")
 
@@ -13,6 +14,29 @@ def show_dashboard():
     st.title("AppFinanzAr - Dashboard")
     ticker = st.text_input("Ingrese ticker (ej: MELI.US)", "MELI.US", key="dash_ticker")
 
+    # Rango de fechas rápido
+    range_days = st.selectbox("Rango rápido", options=["1m","3m","6m","1y","5y","max"], index=0, key="dash_range")
+    custom_range = st.checkbox("Usar rango personalizado", key="dash_custom_range")
+
+    if custom_range:
+        start_date = st.date_input("Fecha inicio", value=(datetime.today() - timedelta(days=30)), key="dash_start")
+        end_date = st.date_input("Fecha fin", value=datetime.today(), key="dash_end")
+    else:
+        today = datetime.today().date()
+        if range_days == "1m":
+            start_date = today - timedelta(days=30)
+        elif range_days == "3m":
+            start_date = today - timedelta(days=90)
+        elif range_days == "6m":
+            start_date = today - timedelta(days=180)
+        elif range_days == "1y":
+            start_date = today - timedelta(days=365)
+        elif range_days == "5y":
+            start_date = today - timedelta(days=365*5)
+        else:
+            start_date = today - timedelta(days=365*10)
+        end_date = today
+        
     # Sidebar favoritos
     if not os.path.exists(FAV_PATH):
         save_json(FAV_PATH, [])
@@ -24,11 +48,6 @@ def show_dashboard():
     st.sidebar.write("### Favoritos")
     for f in favorites:
         st.sidebar.write(f"- {f}")
-
-    # Fechas
-    today = pd.Timestamp.today().date()
-    start_date = st.sidebar.date_input("Fecha inicio", today - pd.Timedelta(days=30))
-    end_date = st.sidebar.date_input("Fecha fin", today)
 
     # SMA/EMA/RSI
     sma_short = st.sidebar.number_input("SMA corto", value=20)
