@@ -1,6 +1,8 @@
+# core/auth.py
 import json
 import os
 import hashlib
+import streamlit as st
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "users_example.json")
 
@@ -26,7 +28,6 @@ class AuthManager:
 
         stored_hash = self.users[username]["password_hash"]
         entered_hash = self.hash_password(password)
-
         return stored_hash == entered_hash
 
     def create_user(self, username, password, role="user", email=""):
@@ -39,8 +40,24 @@ class AuthManager:
 
         data = list(self.users.values())
         data.append(new_user)
-
         with open(DATA_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
+        self.users[username] = new_user
 
-        self.users = self.load_users()
+# ----------------------------
+# Integración con Streamlit
+# ----------------------------
+def init_session():
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+    if "username" not in st.session_state:
+        st.session_state["username"] = ""
+
+def login_user(username, password):
+    auth = AuthManager()
+    if auth.login(username, password):
+        st.session_state["logged_in"] = True
+        st.session_state["username"] = username
+        st.experimental_rerun()
+    else:
+        st.error("Usuario o contraseña incorrectos")
