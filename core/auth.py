@@ -1,70 +1,75 @@
-import json, bcrypt, os
+import bcrypt
+import json
+import os
+from typing import Dict, Any, Optional
 
-# Ruta absoluta segura
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(BASE_DIR, "..", "data", "users_example.json")
-DATA_PATH = os.path.normpath(DATA_PATH)
 
 class AuthManager:
-    def __init__(self):
-        print("🔍 [DEBUG] AuthManager inicializado")
-        print(f"🔍 [DEBUG] Cargando usuarios desde: {DATA_PATH}")
-        self.users = self._load()
+    def __init__(self, users_file: str = "data/users_example.json"):
+        self.users_file = users_file
+        self.users = self._load_users()
 
-        # Mostrar usuarios encontrados
-        print(f"🔍 [DEBUG] Usuarios cargados ({len(self.users)}):")
-        for u in self.users:
-            print("     -", u.get("username"), "| hash:", u.get("password_hash"))
+    # ----------------------------
+    # DEBUG LOGIN
+    # ----------------------------
+    def login(self, username: str, password: str) -> Optional[Dict[str, Any]]:
+        print("\n=============================")
+        print("🔍 DEBUG LOGIN ACTIVADO")
+        print("=============================")
 
-    def _load(self):
-        if os.path.exists(DATA_PATH):
-            try:
-                with open(DATA_PATH, "r") as f:
-                    data = json.load(f)
-                    print("🔍 [DEBUG] Archivo JSON leído correctamente.")
-                    return data
-            except Exception as e:
-                print("❌ [ERROR] No se pudo leer el archivo JSON:", e)
-                return []
-        else:
-            print("❌ [ERROR] No existe el archivo en ruta:", DATA_PATH)
-        return []
+        print(f"Usuario recibido: '{username}' (len={len(username)})")
+        print(f"Password recibido: [NO SE MUESTRA] len={len(password)}")
 
-    def _save(self):
+        if username not in self.users:
+            print("❌ Usuario no encontrado en el archivo JSON")
+            print("Usuarios disponibles:", list(self.users.keys()))
+            return None
+
+        user_data = self.users[username]
+        stored_hash = user_data["password_hash"]
+
+        print(f"Hash guardado: '{stored_hash}' (len={len(stored_hash)})")
+
         try:
-            with open(DATA_PATH, "w") as f:
-                json.dump(self.users, f, indent=2)
-            print("💾 [DEBUG] Archivo JSON actualizado correctamente.")
+            password_bytes = password.encode("utf-8")
+            hash_bytes = stored_hash.encode("utf-8")
+
+            print("⚙ Ejecutando bcrypt.checkpw()...")
+            result = bcrypt.checkpw(password_bytes, hash_bytes)
+
+            print(f"Resultado checkpw = {result}")
+
+            if result:
+                print("✅ LOGIN EXITOSO")
+                return user_data
+            else:
+                print("❌ CONTRASEÑA INCORRECTA")
+                return None
+
         except Exception as e:
-            print("❌ [ERROR] No se pudo guardar el archivo JSON:", e)
+            print("💥 ERROR EN LOGIN:", e)
+            return None
 
-    def login(self, user, pwd):
-        print(f"🔐 [DEBUG] Intento de login → usuario ingresado: {user}")
+    # ----------------------------
+    # Carga usuarios
+    # ----------------------------
+    def _load_users(self) -> Dict[str, Any]:
+        print(f"[DEBUG] Cargando usuarios desde: {self.users_file}")
 
-        for u in self.users:
-            print(f"    ⤷ Comparando con usuario: {u['username']}")
-            if u["username"] == user:
-                print("    ✔ Usuario encontrado. Verificando password…")
-                ok = bcrypt.checkpw(pwd.encode(), u["password_hash"].encode())
-                print("    ✔ Resultado bcrypt:", ok)
-                return ok
+        if not os.path.exists(self.users_file):
+            print("💥 Archivo de usuarios no encontrado.")
+            return {}
 
-        print("    ❌ Usuario NO encontrado.")
-        return False
+        try:
+            with open(self.users_file, "r") as f:
+                users = json.load(f)
+        except Exception as e:
+            print("💥 Error leyendo JSON:", e)
+            return {}
 
-    def create_user(self, user, pwd, role="user", email=""):
-        print(f"🆕 [DEBUG] Creando usuario: {user}")
-        hashed = bcrypt.hashpw(pwd.encode(), bcrypt.gensalt()).decode()
+        print("[DEBUG] Usuarios cargados:")
+        for u in users:
+            print("   -", u["username"])
 
-        self.users.append({
-            "username": user,
-            "password_hash": hashed,
-            "role": role,
-            "email": email
-        })
+        return {u["username"]: u for u in users}
 
-        self._save()
-        print("🆕 ✔ Usuario creado correctamente.")
-
-
-       
