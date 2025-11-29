@@ -5,14 +5,22 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+from core.auth import init_session
+from ui.login_ui import login_screen
+from ui.dashboard_ui import show_dashboard
 
-# local import (login.py must exist)
-from login import login_screen
+# Inicializar session_state
+init_session()
+
+if not st.session_state["logged_in"]:
+    login_screen()
+else:
+    show_dashboard()
 
 # -------------------------
 # Page config & style
 # -------------------------
-st.set_page_config(page_title="FinanzApp PRO", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="AppFinanzAr", layout="wide", initial_sidebar_state="expanded")
 # Dark theme tweaks (some inline CSS)
 st.markdown(
     """
@@ -114,7 +122,7 @@ def fetch_news(ticker: str, from_date: str = None):
 # UI Layout
 # -------------------------
 sidebar = st.sidebar
-sidebar.title("FinanzApp PRO")
+sidebar.title("AppFinanzAr")
 sidebar.write(f"Usuario: **{st.session_state.get('username')}**")
 sidebar.markdown("---")
 
@@ -167,7 +175,7 @@ rsi_period = sidebar.number_input("RSI periodo", value=14, min_value=1)
 # -------------------------
 # Main area - Header
 # -------------------------
-st.title("📈 FinanzApp PRO — Dashboard")
+st.title("📈 AppFinanzAr — Dashboard")
 st.markdown(f"**Ticker:** {symbol.upper()}  •  **Rango:** {start_date} → {end_date}")
 
 # -------------------------
