@@ -3,8 +3,6 @@ import streamlit as st
 from core.auth import login_user
 
 def login_screen():
-    # Logo arriba
-    st.image("assets/logo_finanzapp.svg", width=200)
     
     # Título y descripción
     st.title("AppFinanzAr")
