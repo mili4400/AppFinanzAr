@@ -7,13 +7,13 @@
     },
     {
         "username": "manu",
-        "password_hash": "40f1f9bd093f3f65e25e9e9d5ffa380de91b79458ada56f4cd13eaa9bbf4cb7a",
+        "password_hash": "b465d26e1646cbf9a1ed04f22c7463cee2353422274c9d4681980a248f4f1f39",
         "role": "user",
         "email": ""
     },
     {
         "username": "mili",
-        "password_hash": "cfce3dbe9ea1931ba84497b92c65dd612bef9485c2b42d081ceccbfa4dbf62df",
+        "password_hash": "c51756a7e9e20e3957f5e7ce2b86611096dab53c6c64cc2531594db031c5b805",
         "role": "user",
         "email": ""
     }
