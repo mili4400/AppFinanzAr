@@ -1,7 +1,8 @@
 # core/config.py
+import streamlit as st
 
-# Clave de API para EODHD
-API_KEY = "6915ae41dca776.51369114"  
+# 🔑 Clave de API para EODHD desde Streamlit Secrets
+API_KEY = st.secrets["EODHD_API_KEY"]
 
-# Parámetros generales (opcional)
+# 📅 Parámetros generales
 NEWS_DAYS_BACK = 60  # cantidad de días atrás para buscar noticias
