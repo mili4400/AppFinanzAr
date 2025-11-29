@@ -10,14 +10,13 @@ from datetime import datetime, timedelta
 FAV_PATH = os.path.join("data", "favorites.json")
 
 def show_dashboard():
-    # Logo arriba
+    # Logo y título
     st.image("assets/logo_finanzapp.svg", width=150)
     st.title("AppFinanzAr - Dashboard")
-    
-    # Ticker input
+
     ticker = st.text_input("Ingrese ticker (ej: MELI.US)", "MELI.US", key="dash_ticker")
 
-    # Rango de fechas rápido
+    # Rango de fechas rápido o personalizado
     range_days = st.selectbox("Rango rápido", options=["1m","3m","6m","1y","5y","max"], index=0, key="dash_range")
     custom_range = st.checkbox("Usar rango personalizado", key="dash_custom_range")
 
@@ -26,21 +25,15 @@ def show_dashboard():
         end_date = st.date_input("Fecha fin", value=datetime.today(), key="dash_end")
     else:
         today = datetime.today().date()
-        if range_days == "1m":
-            start_date = today - timedelta(days=30)
-        elif range_days == "3m":
-            start_date = today - timedelta(days=90)
-        elif range_days == "6m":
-            start_date = today - timedelta(days=180)
-        elif range_days == "1y":
-            start_date = today - timedelta(days=365)
-        elif range_days == "5y":
-            start_date = today - timedelta(days=365*5)
-        else:
-            start_date = today - timedelta(days=365*10)
+        if range_days == "1m": start_date = today - timedelta(days=30)
+        elif range_days == "3m": start_date = today - timedelta(days=90)
+        elif range_days == "6m": start_date = today - timedelta(days=180)
+        elif range_days == "1y": start_date = today - timedelta(days=365)
+        elif range_days == "5y": start_date = today - timedelta(days=365*5)
+        else: start_date = today - timedelta(days=365*10)
         end_date = today
 
-    # Sidebar favoritos
+    # Sidebar: favoritos
     if not os.path.exists(FAV_PATH):
         save_json(FAV_PATH, [])
     favorites = load_json(FAV_PATH, [])
@@ -48,6 +41,7 @@ def show_dashboard():
         favorites.append(ticker.upper())
         save_json(FAV_PATH, favorites)
         st.success(f"{ticker.upper()} agregado a Favoritos")
+
     st.sidebar.write("### Favoritos")
     for f in favorites:
         st.sidebar.write(f"- {f}")
@@ -64,7 +58,6 @@ def show_dashboard():
             st.error("No se encontraron datos históricos.")
             return
 
-        # Cálculos técnicos
         df["SMA_short"] = sma(df["close"], sma_short)
         df["SMA_long"] = sma(df["close"], sma_long)
         df["EMA"] = ema(df["close"], ema_span)
