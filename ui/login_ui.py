@@ -1,13 +1,14 @@
-# ui/login_ui.py
 import streamlit as st
 from core.auth import login_user
 
 def login_screen():
-    st.title("AppFinanzAr")  # <- título corregido
+    st.title("AppFinanzAr")
     st.write("Por favor, ingresa tus credenciales")
 
-    username = st.text_input("Usuario")
-    password = st.text_input("Contraseña", type="password")
+    # Usamos keys únicas para evitar StreamlitDuplicateElementId
+    username = st.text_input("Usuario", key="login_username")
+    password = st.text_input("Contraseña", type="password", key="login_password")
 
-    if st.button("Login"):
+    # Botón con key único
+    if st.button("Login", key="login_button"):
         login_user(username, password)
