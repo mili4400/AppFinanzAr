@@ -29,29 +29,11 @@ class AuthManager:
         entered_hash = self.hash_password(password)
         return stored_hash == entered_hash
 
-    def create_user(self, username, password, role="user", email=""):
-        new_user = {
-            "username": username,
-            "password_hash": self.hash_password(password),
-            "role": role,
-            "email": email
-        }
-        data = list(self.users.values())
-        data.append(new_user)
-        with open(DATA_PATH, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
-        self.users[username] = new_user
-
-# -----------------------------
-# Streamlit session helpers
-# -----------------------------
 def init_session():
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
     if "username" not in st.session_state:
         st.session_state["username"] = ""
-    if "favorites" not in st.session_state:
-        st.session_state["favorites"] = []
 
 def login_user(username, password):
     auth = AuthManager()
