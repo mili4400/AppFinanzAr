@@ -40,6 +40,9 @@ def login_user(username, password):
     if auth.login(username, password):
         st.session_state["logged_in"] = True
         st.session_state["username"] = username
-        st.experimental_rerun()
+        st.success(f"Bienvenido {username}")
+        st.experimental_rerun()  # recarga la página
     else:
         st.error("Usuario o contraseña incorrectos")
+
+
