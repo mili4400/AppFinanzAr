@@ -4,7 +4,9 @@ import os
 import hashlib
 import streamlit as st
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "users_example.json")
+# Ruta absoluta al directorio raíz del proyecto
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DATA_PATH = os.path.join(BASE_DIR, "data", "users_example.json")
 
 class AuthManager:
     def __init__(self):
@@ -14,7 +16,6 @@ class AuthManager:
         try:
             with open(DATA_PATH, "r", encoding="utf-8") as f:
                 users = json.load(f)
-            # Convertir a dict {username: user_obj}
             return {u["username"]: u for u in users}
         except Exception as e:
             print("[ERROR] No se pudo leer users_example.json:", e)
@@ -43,6 +44,7 @@ class AuthManager:
             json.dump(data, f, indent=4)
         self.users[username] = new_user
 
+
 # ----------------------------
 # Integración con Streamlit
 # ----------------------------
@@ -52,6 +54,7 @@ def init_session():
     if "username" not in st.session_state:
         st.session_state["username"] = ""
 
+
 def login_user(username, password):
     auth = AuthManager()
     if auth.login(username, password):
@@ -60,4 +63,5 @@ def login_user(username, password):
         st.experimental_rerun()
     else:
         st.error("Usuario o contraseña incorrectos")
+
 
