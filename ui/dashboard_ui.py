@@ -10,8 +10,11 @@ from datetime import datetime, timedelta
 FAV_PATH = os.path.join("data", "favorites.json")
 
 def show_dashboard():
-    st.image("assets/logo_finanzapp.svg", width=150)  # Logo arriba
+    # Logo arriba
+    st.image("assets/logo_finanzapp.svg", width=150)
     st.title("AppFinanzAr - Dashboard")
+    
+    # Ticker input
     ticker = st.text_input("Ingrese ticker (ej: MELI.US)", "MELI.US", key="dash_ticker")
 
     # Rango de fechas rápido
@@ -36,7 +39,7 @@ def show_dashboard():
         else:
             start_date = today - timedelta(days=365*10)
         end_date = today
-        
+
     # Sidebar favoritos
     if not os.path.exists(FAV_PATH):
         save_json(FAV_PATH, [])
@@ -61,6 +64,7 @@ def show_dashboard():
             st.error("No se encontraron datos históricos.")
             return
 
+        # Cálculos técnicos
         df["SMA_short"] = sma(df["close"], sma_short)
         df["SMA_long"] = sma(df["close"], sma_long)
         df["EMA"] = ema(df["close"], ema_span)
