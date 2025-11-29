@@ -1,11 +1,10 @@
 # core/auth.py
 import json
+import os
 import hashlib
 import streamlit as st
-import os
 
-# Usar ruta relativa al working directory de Streamlit
-DATA_PATH = os.path.join("data", "users_example.json")
+DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "users_example.json")
 
 class AuthManager:
     def __init__(self):
@@ -15,10 +14,10 @@ class AuthManager:
         try:
             with open(DATA_PATH, "r", encoding="utf-8") as f:
                 users = json.load(f)
-            # Convertir a dict por username para acceso rápido
+            # Convertir a dict {username: user_obj}
             return {u["username"]: u for u in users}
         except Exception as e:
-            st.error(f"[ERROR] No se pudo leer users_example.json: {e}")
+            print("[ERROR] No se pudo leer users_example.json:", e)
             return {}
 
     def hash_password(self, pwd: str) -> str:
@@ -45,7 +44,7 @@ class AuthManager:
         self.users[username] = new_user
 
 # ----------------------------
-# Streamlit session helpers
+# Integración con Streamlit
 # ----------------------------
 def init_session():
     if "logged_in" not in st.session_state:
