@@ -1,35 +1,64 @@
+import json
+import bcrypt
+import os
 
-import json, bcrypt, os
+# Construir ruta absoluta hacia data/users_example.json
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(BASE_DIR, "..", "data", "users_example.json")
+DATA_PATH = os.path.normpath(DATA_PATH)
 
-DATA_PATH="data/users_example.json"
 
 class AuthManager:
     def __init__(self):
-        self.users=self._load()
+        self.users = self._load()
 
     def _load(self):
+        # Debug opcional para ver qué archivo se está cargando
+        print(f"[Auth] Cargando usuarios desde: {DATA_PATH}")
+
         if os.path.exists(DATA_PATH):
-            with open(DATA_PATH,"r") as f:
-                return json.load(f)
+            try:
+                with open(DATA_PATH, "r") as f:
+                    data = json.load(f)
+                    print(f"[Auth] Usuarios cargados: {[u['username'] for u in data]}")
+                    return data
+            except Exception as e:
+                print("[Auth] Error leyendo archivo de usuarios:", e)
+                return []
+        else:
+            print("[Auth] Archivo de usuarios NO encontrado:", DATA_PATH)
         return []
 
     def _save(self):
-        with open(DATA_PATH,"w") as f:
-            json.dump(self.users,f,indent=2)
+        try:
+            with open(DATA_PATH, "w") as f:
+                json.dump(self.users, f, indent=2)
+            print("[Auth] Usuarios guardados exitosamente.")
+        except Exception as e:
+            print("[Auth] Error guardando usuarios:", e)
 
     def login(self, user, pwd):
         for u in self.users:
-            if u["username"]==user:
-                if bcrypt.checkpw(pwd.encode(), u["password_hash"].encode()):
-                    return True
+            if u.get("username") == user:
+                try:
+                    if bcrypt.checkpw(pwd.encode(), u["password_hash"].encode()):
+                        print(f"[Auth] Login correcto para usuario '{user}'")
+                        return True
+                except Exception as e:
+                    print("[Auth] Error verificando contraseña:", e)
+        print(f"[Auth] Login fallido para usuario '{user}'")
         return False
 
     def create_user(self, user, pwd, role="user", email=""):
-        hashed=bcrypt.hashpw(pwd.encode(), bcrypt.gensalt()).decode()
-        self.users.append({
-            "username":user,
-            "password_hash":hashed,
-            "role":role,
-            "email":email
-        })
+        hashed = bcrypt.hashpw(pwd.encode(), bcrypt.gensalt()).decode()
+        new_user = {
+            "username": user,
+            "password_hash": hashed,
+            "role": role,
+            "email": email
+        }
+
+        self.users.append(new_user)
         self._save()
+        print(f"[Auth] Usuario creado: {user}")
+
