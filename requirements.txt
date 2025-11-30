@@ -5,4 +5,6 @@ plotly
 bcrypt
 python-dateutil
 textblob
+transformers
+torch
 
