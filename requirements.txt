@@ -7,4 +7,5 @@ python-dateutil
 textblob
 transformers
 torch
+deep-translator
 
