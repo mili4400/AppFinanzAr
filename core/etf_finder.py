@@ -120,3 +120,43 @@ def get_etf_metadata(ticker):
             pass
     # fallback minimal
     return {"ticker": ticker}
+
+def etf_screener(theme: str = None, limit: int = 20):
+    """
+    Wrapper requerido por la app principal.
+    NO reemplaza tus funciones. Solo expone un formato estándar:
+    
+    - Si theme es None: devuelve todos los ETFs del universo.
+    - Si theme existe: devuelve ETFs solo de esa categoría.
+    - Respeta límite.
+    """
+    universe = get_universe()
+
+    results = []
+
+    # 1) Si el usuario pide un theme específico
+    if theme:
+        theme_l = theme.lower()
+        for t, etfs in universe.items():
+            if theme_l in t.lower():
+                for e in etfs:
+                    results.append({
+                        "ticker": e.get("ticker"),
+                        "name": e.get("name"),
+                        "desc": e.get("desc", ""),
+                        "theme": t
+                    })
+        return results[:limit]
+
+    # 2) Si no se especifica theme → devolver TODO el universo
+    for t, etfs in universe.items():
+        for e in etfs:
+            results.append({
+                "ticker": e.get("ticker"),
+                "name": e.get("name"),
+                "desc": e.get("desc", ""),
+                "theme": t
+            })
+
+    return results[:limit]
+
