@@ -2,7 +2,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from core.fundamentals import fetch_fundamentals
 from core.data_fetch import fetch_ohlc, fetch_news
-from core.utils import sentiment_score
+from core.sentiment import sentiment_score
 
 
 def summarize_text_local(paragraph, max_sentences=3):
