@@ -30,3 +30,28 @@ def compare_tickers(ticker1, ticker2, period="3mo"):
                                 merged[f"close_{ticker2}"].iloc[0] - 1) * 100
 
     return merged
+
+def get_competitors(ticker):
+    """
+    Retorna una lista simple de competidores basada en ETF/acciones del mismo sector.
+    Esto evita romper el dashboard mientras mantemos toda tu lógica.
+    """
+    from core.fundamentals import fetch_fundamentals
+
+    fundamentals, _ = fetch_fundamentals(ticker)
+
+    sector = fundamentals.get("Sector") or fundamentals.get("sector") or None
+
+    if not sector:
+        return []
+
+    # Lógica de ejemplo – puedes ampliarlo cuando veas la UI
+    competitors_map = {
+        "Technology": ["AAPL", "MSFT", "GOOGL", "NVDA"],
+        "Financial": ["JPM", "BAC", "WFC"],
+        "Healthcare": ["JNJ", "PFE", "ABBV"],
+        "Energy": ["XOM", "CVX", "COP"],
+    }
+
+    return competitors_map.get(sector, [])
+
