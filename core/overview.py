@@ -171,3 +171,44 @@ def create_overview(ticker):
     summary["narrative"] = " ".join(narrative)
 
     return summary
+def build_overview(ticker: str):
+    """
+    Wrapper usado por dashboard_ui.
+    Combina:
+    - fundamentals
+    - competitors
+    - price data
+    - news
+    - sentiment
+    - executive summary avanzado (tu create_overview)
+    """
+
+    # Executive summary avanzado basado en tu lógica
+    summary = create_overview(ticker)
+
+    # Datos adicionales del dashboard
+    fundamentals, competitors = fetch_fundamentals(ticker)
+    price_data = fetch_ohlc(ticker)
+    news = fetch_news(ticker)
+
+    # Etiqueta simple de sentimiento
+    sentiment_info = summary.get("sentiment", None)
+    if sentiment_info:
+        sentiment_label = {
+            "positivo": "📈 Positivo",
+            "negativo": "📉 Negativo",
+            "neutral": "🔍 Neutral"
+        }.get(sentiment_info["label"], "🔍 Neutral")
+    else:
+        sentiment_label = "Sin datos"
+
+    return {
+        "fundamentals": fundamentals,
+        "competitors": competitors,
+        "price": price_data,
+        "news": news,
+        "sentiment_value": sentiment_info["avg_score"] if sentiment_info else 0,
+        "sentiment_label": sentiment_label,
+        "fundamentals_summary": summary["narrative"],   # resumen avanzado
+        "executive_summary": summary                     # TODO: usar en UI futura
+    }
