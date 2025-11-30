@@ -23,11 +23,14 @@ class AuthManager:
         return hashlib.sha256(pwd.encode()).hexdigest()
 
     def login(self, username: str, password: str) -> bool:
-        if username not in self.users:
-            return False
-        stored_hash = self.users[username]["password_hash"]
-        entered_hash = self.hash_password(password)
-        return stored_hash == entered_hash
+    if username not in self.users:
+        return False
+    
+    stored = self.users[username]["password_hash"]
+    entered_hash = self.hash_password(password)
+
+    # permite texto plano y hash
+    return stored == password or stored == entered_hash
 
 # ----------------------------
 # Sesión Streamlit
