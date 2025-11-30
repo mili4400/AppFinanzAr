@@ -1,6 +1,19 @@
-def analyze_sentiment_textblob(text):
-    """Versión placeholder para evitar errores si no usás análisis de sentimiento."""
-    return {
-        "label": "neutral",
-        "polarity": 0.0
-    }
+from textblob import TextBlob
+
+def analyze_sentiment_textblob(text: str):
+    """
+    Analiza sentimiento usando TextBlob.
+    Devuelve:
+        polarity (-1 a 1)
+        subjectivity (0 a 1)
+    """
+    if not text or not isinstance(text, str):
+        return 0, 0
+
+    try:
+        blob = TextBlob(text)
+        polarity = blob.sentiment.polarity
+        subjectivity = blob.sentiment.subjectivity
+        return polarity, subjectivity
+    except:
+        return 0, 0
