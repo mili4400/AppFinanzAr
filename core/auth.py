@@ -4,9 +4,7 @@ import os
 import hashlib
 import streamlit as st
 
-# Ruta absoluta al directorio raíz del proyecto
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DATA_PATH = os.path.join(BASE_DIR, "data", "users_example.json")
+DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "users_example.json")
 
 class AuthManager:
     def __init__(self):
@@ -31,22 +29,8 @@ class AuthManager:
         entered_hash = self.hash_password(password)
         return stored_hash == entered_hash
 
-    def create_user(self, username, password, role="user", email=""):
-        new_user = {
-            "username": username,
-            "password_hash": self.hash_password(password),
-            "role": role,
-            "email": email
-        }
-        data = list(self.users.values())
-        data.append(new_user)
-        with open(DATA_PATH, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
-        self.users[username] = new_user
-
-
 # ----------------------------
-# Integración con Streamlit
+# Sesión Streamlit
 # ----------------------------
 def init_session():
     if "logged_in" not in st.session_state:
@@ -54,14 +38,12 @@ def init_session():
     if "username" not in st.session_state:
         st.session_state["username"] = ""
 
-
 def login_user(username, password):
     auth = AuthManager()
+
     if auth.login(username, password):
         st.session_state["logged_in"] = True
         st.session_state["username"] = username
-        st.experimental_rerun()
     else:
         st.error("Usuario o contraseña incorrectos")
-
 
