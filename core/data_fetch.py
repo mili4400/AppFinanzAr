@@ -62,8 +62,9 @@ def translate_text(text, target_lang="es"):
 
 def fetch_historical_data(ticker, period="1y", interval="1d"):
     """
-    Devuelve datos históricos OHLCV desde la API EODHD.
     Mantiene compatibilidad con el antiguo fetch_historical_data esperado por compare.py.
+    Devuelve datos históricos OHLCV usando la función fetch_eodhd estándar
+    definida en core/eodhd_api.py
     """
 
     # Mapear periodos a días
@@ -78,19 +79,15 @@ def fetch_historical_data(ticker, period="1y", interval="1d"):
 
     days = period_map.get(period, 365)
 
+   # Llamada compatible con la nueva función fetch_eodhd
     data = fetch_eodhd(
-        endpoint="historical-prices",
-        params={
-            "s": ticker,
-            "from": None,
-            "to": None,
-            "period": interval
-        }
+        ticker,
+        interval=interval,
+        limit=days
     )
 
-    if not data:
+    if not data or not isinstance(data, list):
         return []
 
-    # Reducir tamaño según periodo solicitado
-    return data[-days:]
+    return data
 
