@@ -3,6 +3,7 @@
 import streamlit as st
 from core.eodhd_api import api_get
 from googletrans import Translator
+from textblob import TextBlob
 
 translator = Translator()
 
@@ -64,6 +65,14 @@ def translate_text_if_needed(text, lang):
         return text
 
 
+def sentiment_score(text):
+    """ Devuelve sentimiento (+ = positivo, - = negativo) """
+    if not text:
+        return 0
+    blob = TextBlob(text)
+    return round(blob.sentiment.polarity, 3)
+
+
 def process_news(ticker, lang="EN"):
     """
     - Obtiene noticias
@@ -77,11 +86,15 @@ def process_news(ticker, lang="EN"):
 
     processed = []
     for article in relevant:
+        original_text = f"{article.get('title','')} {article.get('content','')}"
+        sent = sentiment_score(original_text)  # intentamos siempre en EN
+
         processed.append({
             "title": translate_text_if_needed(article.get("title", ""), lang),
             "content": translate_text_if_needed(article.get("content", ""), lang),
             "date": article.get("date"),
-            "url": article.get("url")
+            "url": article.get("url"),
+            "sentiment": sent
         })
 
     return processed
