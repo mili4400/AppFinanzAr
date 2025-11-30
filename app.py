@@ -5,12 +5,17 @@ from ui.login_ui import login_screen
 from ui.dashboard_ui import show_dashboard
 
 st.set_page_config(page_title="AppFinanzAr", layout="wide")
-
 init_session()
 
-# Si no está logueado → mostrar login
+# Sidebar: cerrar sesión
+if st.session_state.get("logged_in", False):
+    with st.sidebar:
+        if st.button("🔒 Cerrar sesión"):
+            st.session_state["logged_in"] = False
+            st.session_state["username"] = ""
+
+# Mostrar pantalla según login
 if not st.session_state["logged_in"]:
     login_screen()
 else:
     show_dashboard()
-
