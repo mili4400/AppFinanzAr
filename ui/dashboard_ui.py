@@ -1,103 +1,182 @@
-# ui/dashboard_ui.py
+# ui/dashboard_ui.py 
 import streamlit as st
 import plotly.graph_objects as go
-from core.data_fetch import fetch_ohlc, fetch_fundamentals, fetch_news
-from core.utils import sma, ema, rsi, load_json, save_json
-import os
 import pandas as pd
 from datetime import datetime, timedelta
 
-FAV_PATH = os.path.join("data", "favorites.json")
+from core.data_fetch import fetch_ohlc, fetch_fundamentals, fetch_news
+from core.sentiment import analyze_sentiment_textblob
+from core.overview import build_overview
+from core.competitors import get_competitors
+from core.etf_finder import etf_screener
+from core.favorites import load_favorites, add_favorite
+from core.compare_pro import compare_indicators, compare_sentiment
+from core.utils import sma, ema, rsi
 
+# =============================
+# DASHBOARD PRINCIPAL
+# =============================
 def show_dashboard():
-    st.title("AppFinanzAr - Dashboard")
+    st.title("📊 AppFinanzAr – Dashboard Completo")
 
-    ticker = st.text_input("Ingrese ticker (ej: MELI.US)", "MELI.US", key="dash_ticker")
+    # -----------------------------
+    # TICKER + AUTOCOMPLETE
+    # -----------------------------
+    ticker = st.text_input("Ingrese ticker (ej: MSFT.US)", "MSFT.US", key="dash_ticker")
 
-    # Rango de fechas rápido o personalizado
-    range_days = st.selectbox("Rango rápido", options=["1m","3m","6m","1y","5y","max"], index=0, key="dash_range")
-    custom_range = st.checkbox("Usar rango personalizado", key="dash_custom_range")
+    # -----------------------------
+    # RANGO DE FECHAS
+    # -----------------------------
+    range_days = st.selectbox("Rango rápido", ["1m","3m","6m","1y","5y","max"], index=0)
+    custom_range = st.checkbox("Usar rango personalizado")
 
     if custom_range:
-        start_date = st.date_input("Fecha inicio", value=(datetime.today() - timedelta(days=30)), key="dash_start")
-        end_date = st.date_input("Fecha fin", value=datetime.today(), key="dash_end")
+        start_date = st.date_input("Inicio", datetime.today() - timedelta(days=30))
+        end_date = st.date_input("Fin", datetime.today())
     else:
         today = datetime.today().date()
-        if range_days == "1m": start_date = today - timedelta(days=30)
-        elif range_days == "3m": start_date = today - timedelta(days=90)
-        elif range_days == "6m": start_date = today - timedelta(days=180)
-        elif range_days == "1y": start_date = today - timedelta(days=365)
-        elif range_days == "5y": start_date = today - timedelta(days=365*5)
-        else: start_date = today - timedelta(days=365*10)
+        mapping = {"1m":30, "3m":90, "6m":180, "1y":365, "5y":365*5, "max":365*10}
+        start_date = today - timedelta(days=mapping[range_days])
         end_date = today
 
-    # Sidebar: favoritos
-    if not os.path.exists(FAV_PATH):
-        save_json(FAV_PATH, [])
-    favorites = load_json(FAV_PATH, [])
-    if st.sidebar.button("Agregar a Favoritos") and ticker.upper() not in favorites:
-        favorites.append(ticker.upper())
-        save_json(FAV_PATH, favorites)
-        st.success(f"{ticker.upper()} agregado a Favoritos")
+    # -----------------------------
+    # FAVORITOS FREE
+    # -----------------------------
+    st.sidebar.markdown("### ⭐ Favoritos (FREE)")
+    st.sidebar.caption("Máximo 5 → Para más: versión PRO")
 
-    st.sidebar.write("### Favoritos")
-    for f in favorites:
-        st.sidebar.write(f"- {f}")
+    favs = load_favorites()
+    MAX_FAVS = 5
 
-    # SMA/EMA/RSI
-    sma_short = st.sidebar.number_input("SMA corto", value=20)
-    sma_long = st.sidebar.number_input("SMA largo", value=50)
-    ema_span = st.sidebar.number_input("EMA", value=20)
-    rsi_period = st.sidebar.number_input("RSI periodo", value=14)
+    if st.sidebar.button("Agregar ticker a Favoritos"):
+        tu = ticker.upper()
+        if tu in favs['all']:
+            st.sidebar.warning("El ticker ya está en favoritos.")
+        elif len(favs['all']) >= MAX_FAVS:
+            st.sidebar.error("Límite alcanzado (5). Versión PRO disponible.")
+        else:
+            add_favorite(tu)
+            st.sidebar.success(f"{tu} agregado.")
 
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📂 Categorías")
+    for cat, items in favs['categories'].items():
+        if items:
+            st.sidebar.markdown(f"**{cat.capitalize()}:**")
+            for i in items:
+                st.sidebar.write(f"• {i}")
+    st.sidebar.markdown("---")
+
+    # -----------------------------
+    # CARGA OHLC
+    # -----------------------------
     if ticker:
         df = fetch_ohlc(ticker, from_date=start_date, to_date=end_date)
         if df.empty:
-            st.error("No se encontraron datos históricos.")
+            st.error("No hay datos OHLC disponibles.")
             return
 
-        df["SMA_short"] = sma(df["close"], sma_short)
-        df["SMA_long"] = sma(df["close"], sma_long)
-        df["EMA"] = ema(df["close"], ema_span)
-        df["RSI"] = rsi(df["close"], rsi_period)
+        # -----------------------------
+        # INDICADORES
+        # -----------------------------
+        df["SMA20"] = sma(df["close"], 20)
+        df["SMA50"] = sma(df["close"], 50)
+        df["EMA20"] = ema(df["close"], 20)
+        df["RSI14"] = rsi(df["close"], 14)
 
-        # Candlestick
+        # -----------------------------
+        # GRÁFICO VELAS
+        # -----------------------------
         fig = go.Figure(data=[go.Candlestick(
             x=df["date"], open=df["open"], high=df["high"], low=df["low"], close=df["close"]
         )])
-        fig.add_trace(go.Scatter(x=df["date"], y=df["SMA_short"], mode="lines", name=f"SMA {sma_short}"))
-        fig.add_trace(go.Scatter(x=df["date"], y=df["SMA_long"], mode="lines", name=f"SMA {sma_long}"))
-        fig.add_trace(go.Scatter(x=df["date"], y=df["EMA"], mode="lines", name=f"EMA {ema_span}"))
-        fig.update_layout(template="plotly_dark", height=600)
+        fig.add_trace(go.Scatter(x=df["date"], y=df["SMA20"], mode="lines", name="SMA20"))
+        fig.add_trace(go.Scatter(x=df["date"], y=df["SMA50"], mode="lines", name="SMA50"))
+        fig.add_trace(go.Scatter(x=df["date"], y=df["EMA20"], mode="lines", name="EMA20"))
+        fig.update_layout(height=600, template="plotly_dark")
         st.plotly_chart(fig, use_container_width=True)
 
+        # -----------------------------
         # RSI
-        rsi_fig = go.Figure()
-        rsi_fig.add_trace(go.Scatter(x=df["date"], y=df["RSI"], name="RSI"))
-        rsi_fig.update_layout(template="plotly_dark", height=200)
+        # -----------------------------
+        rsi_fig = go.Figure(go.Scatter(x=df["date"], y=df["RSI14"], name="RSI 14"))
+        rsi_fig.update_layout(height=200, template="plotly_dark")
         st.plotly_chart(rsi_fig, use_container_width=True)
 
-        # Fundamentales
-        fundamentals, competitors = fetch_fundamentals(ticker)
-        st.subheader("Fundamentales clave")
-        if fundamentals:
-            df_f = pd.DataFrame.from_dict(fundamentals, orient="index", columns=["Valor"])
-            st.dataframe(df_f)
-        else:
-            st.info("No se encontraron fundamentales.")
+        # -----------------------------
+        # FUNDAMENTALES + OVERVIEW
+        # -----------------------------
+        fundamentals, competitors_data = fetch_fundamentals(ticker)
 
-        # Competidores
-        st.subheader("Competidores")
+        st.subheader("📘 Overview General del Activo")
+        st.write(build_overview(ticker, fundamentals))
+
+        st.subheader("📂 Fundamentales Clave")
+        if fundamentals:
+            st.dataframe(pd.DataFrame.from_dict(fundamentals, orient="index", columns=["Valor"]))
+        else:
+            st.info("No se encontraron fundamentales válidos.")
+
+        # -----------------------------
+        # COMPETIDORES
+        # -----------------------------
+        st.subheader("🏦 Competidores Reales (Industria / Sector / País)")
+        competitors = get_competitors(ticker, fundamentals)
         if competitors:
             st.write(", ".join(competitors))
         else:
             st.info("No se encontraron competidores.")
 
-        # Noticias
-        st.subheader("Noticias recientes")
+        # -----------------------------
+        # NOTICIAS + SENTIMIENTO
+        # -----------------------------
+        st.subheader("📰 Noticias y Sentimiento")
         news_items = fetch_news(ticker)
+
         if news_items:
+            sentiment_points = []
             for n in news_items[:10]:
-                st.write(f"- {n.get('title')} ({n.get('published_at')})")
+                title = n.get("title", "")
+                published = n.get("published_at", "")
+                translated = title
+                polarity, label = analyze_sentiment_textblob(translated)
+                sentiment_points.append({
+                    "date": published,
+                    "sentiment": polarity,
+                    "label": label,
+                    "title": title
+                })
+                st.write(f"- **{title}** ({published}) → *{label}* ({polarity:.2f})")
+
+            # GRÁFICO DE SENTIMIENTO
+            if sentiment_points:
+                sdf = pd.DataFrame(sentiment_points)
+                fig_s = go.Figure(go.Scatter(
+                    x=sdf['date'], y=sdf['sentiment'], mode="lines+markers",
+                    marker=dict(color=sdf['sentiment'].apply(lambda x: "green" if x>0 else "red" if x<0 else "gray"))
+                ))
+                fig_s.update_layout(title="Sentimiento en el tiempo", template="plotly_dark")
+                st.plotly_chart(fig_s, use_container_width=True)
         else:
-            st.info("No se encontraron noticias.")
+            st.info("No hay noticias disponibles.")
+
+        # -----------------------------
+        # ETF FINDER
+        # -----------------------------
+        st.subheader("📈 ETF Finder (Temático)")
+        tema = st.text_input("Tema (ej: AI, Energy, Metals)")
+        if tema:
+            etfs = etf_screener(tema)
+            if etfs:
+                st.write(etfs)
+            else:
+                st.info("No se encontraron ETFs temáticos.")
+
+        # -----------------------------
+        # COMPARACIÓN PRO (2 TICKERS)
+        # -----------------------------
+        st.subheader("⚔️ Comparación entre dos tickers (FREE)")
+        t2 = st.text_input("Ticker a comparar", "AAPL.US")
+        if t2:
+            st.write(compare_indicators(ticker, t2))
+            st.write(compare_sentiment(ticker, t2))
