@@ -3,6 +3,8 @@ import requests
 import pandas as pd
 from datetime import date, timedelta
 from .config import API_KEY, NEWS_DAYS_BACK
+from core.eodhd_api import fetch_eodhd
+
 
 def fetch_ohlc(ticker, from_date=None, to_date=None):
     url = f"https://eodhistoricaldata.com/api/eod/{ticker}?api_token={API_KEY}&fmt=json"
@@ -56,3 +58,39 @@ def fetch_news(ticker, days_back=NEWS_DAYS_BACK, translate_to_es=True):
 def translate_text(text, target_lang="es"):
     # Placeholder: reemplazar con API real de traducción si se desea
     return text
+
+
+def fetch_historical_data(ticker, period="1y", interval="1d"):
+    """
+    Devuelve datos históricos OHLCV desde la API EODHD.
+    Mantiene compatibilidad con el antiguo fetch_historical_data esperado por compare.py.
+    """
+
+    # Mapear periodos a días
+    period_map = {
+        "1m": 30,
+        "3m": 90,
+        "6m": 180,
+        "1y": 365,
+        "2y": 730,
+        "5y": 1825
+    }
+
+    days = period_map.get(period, 365)
+
+    data = fetch_eodhd(
+        endpoint="historical-prices",
+        params={
+            "s": ticker,
+            "from": None,
+            "to": None,
+            "period": interval
+        }
+    )
+
+    if not data:
+        return []
+
+    # Reducir tamaño según periodo solicitado
+    return data[-days:]
+
