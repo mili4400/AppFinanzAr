@@ -1,20 +1,20 @@
 [
-    {
-        "username": "admin",
-        "password_hash": "6c569aabbf7775ef8fc570e228c16b98f16c8f9a8f2f5f8e2d2a0a2e70f12525",
-        "role": "admin",
-        "email": ""
-    },
-    {
-        "username": "manu",
-        "password_hash": "f8b3c6c877e6c6a1dcf0e5fede0cf769b02ee0505c51eaaaccc4d4c76fc04277",
-        "role": "user",
-        "email": ""
-    },
-    {
-        "username": "mili",
-        "password_hash": "f0f2c7dc06c135b1588e8e3f33f0e02877b54aef5a1f9b5b1ef37db32b1f1a4d",
-        "role": "user",
-        "email": ""
-    }
+  {
+    "username": "admin",
+    "password_hash": "6c569aabbf7775ef8fc570e228c16b981c5ec5a85f3e60f7a9e8d6f9e6a8f7b0",
+    "role": "admin",
+    "email": ""
+  },
+  {
+    "username": "manu",
+    "password_hash": "4e2d8e4a4a05dfd514d08ec47fc0d1dca9c2c96d3b28541f71c6c3c048f18d34",
+    "role": "user",
+    "email": ""
+  },
+  {
+    "username": "mili",
+    "password_hash": "dceaeeb9c28e7ee6c46a9a5e54b0565e2b0ce1b88b97333123e6e2296c3b85e8",
+    "role": "user",
+    "email": ""
+  }
 ]
