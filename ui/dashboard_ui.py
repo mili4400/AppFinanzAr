@@ -5,7 +5,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 from core.data_fetch import fetch_ohlc, fetch_fundamentals, fetch_news
-from core.sentiment import analyze_sentiment_textblob
 from core.overview import build_overview
 from core.competitors import get_competitors
 from core.etf_finder import etf_screener
