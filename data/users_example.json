@@ -1,20 +1,21 @@
 [
   {
     "username": "admin",
-    "password_hash": "6c3c7b6f6d4f9c33a22b5e5c98b6b19e5e35a7a6e22f2f1237b5c5e7d2a1f0e0",
+    "password": "admin123",
     "role": "admin",
     "email": ""
   },
   {
     "username": "manu",
-    "password_hash": "2d4f3c5b6a7e9f8c1234b6a7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7",
+    "password": "manu123",
     "role": "user",
     "email": ""
   },
   {
     "username": "mili",
-    "password_hash": "3f5d6e7a8b9c0d1e2f3a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+    "password": "mili123",
     "role": "user",
     "email": ""
   }
 ]
+
