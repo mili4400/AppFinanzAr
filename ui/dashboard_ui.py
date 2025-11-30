@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 from core.data_fetch import fetch_ohlc, fetch_fundamentals, fetch_news
 from core.overview import build_overview
-from core.competitors import get_competitors
+from core.compare import get_competitors
 from core.etf_finder import etf_screener
 from core.favorites import load_favorites, add_favorite
 from core.compare_pro import compare_indicators, compare_sentiment
