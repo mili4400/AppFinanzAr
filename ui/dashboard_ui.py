@@ -44,18 +44,26 @@ def show_dashboard():
     st.sidebar.markdown("### ⭐ Favoritos (FREE)")
     st.sidebar.caption("Máximo 5 → Para más: versión PRO")
 
-    favs = load_favorites()
+    # Supongamos que tenés un usuario activo en session_state
+    username = st.session_state.get("username", "demo")  # "demo" como fallback
+    favs = load_favorites(username)
     MAX_FAVS = 5
 
     if st.sidebar.button("Agregar ticker a Favoritos"):
-        tu = ticker.upper()
-        if tu in favs['all']:
-            st.sidebar.warning("El ticker ya está en favoritos.")
-        elif len(favs['all']) >= MAX_FAVS:
-            st.sidebar.error("Límite alcanzado (5). Versión PRO disponible.")
-        else:
-            add_favorite(tu)
-            st.sidebar.success(f"{tu} agregado.")
+    tu = ticker.upper()
+    if tu in favs['all']:
+        st.sidebar.warning("El ticker ya está en favoritos.")
+    elif len(favs['all']) >= MAX_FAVS:
+        st.sidebar.error("Límite alcanzado (5). Versión PRO disponible.")
+    else:
+        add_favorite(username, tu)
+        st.sidebar.success(f"{tu} agregado.")
+        favs = load_favorites(username)  # actualizar lista
+
+    if st.sidebar.button("Cerrar sesión"):
+        for key in st.session_state.keys():
+            del st.session_state[key]
+        st.experimental_rerun()
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📂 Categorías")
