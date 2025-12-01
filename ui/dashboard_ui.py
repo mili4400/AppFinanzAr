@@ -11,7 +11,6 @@ from core.etf_finder import etf_screener
 from core.favorites import load_favorites, add_favorite
 from core.compare_pro import compare_indicators, compare_sentiment
 from core.utils import sma, ema, rsi
-from core.sentiment import analyze_sentiment_textblob
 
 
 # =============================
