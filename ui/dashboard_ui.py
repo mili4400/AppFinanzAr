@@ -1,10 +1,11 @@
 # ui/dashboard_ui.py 
+# ui/dashboard_ui.py
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 from datetime import datetime, timedelta
 
-from core.data_fetch import fetch_ohlc, fetch_fundamentals, fetch_news
+from core.data_fetch import fetch_ohlc, fetch_fundamentals, fetch_news, search_ticker_by_name
 from core.overview import build_overview
 from core.compare import get_competitors
 from core.etf_finder import etf_screener
@@ -14,21 +15,17 @@ from core.utils import sma, ema, rsi
 from core.sentiment_model import sentiment_score
 
 # ================================
-# FUNCIONES DE SENTIMIENTO (retrocompatibilidad)
+# FUNCIONES DE SENTIMIENTO
 # ================================
 def analyze_sentiment_textblob(text: str):
-    """Retrocompatibilidad: dashboard_ui espera esta función.
-    Usa el modelo transformer real, no TextBlob.
-    """
+    """Retrocompatibilidad: dashboard_ui espera esta función."""
     score = sentiment_score(text)
-
     if score > 0.1:
         label = "positive"
     elif score < -0.1:
         label = "negative"
     else:
         label = "neutral"
-
     return score, label
 
 __all__ = ["analyze_sentiment_textblob", "sentiment_score"]
@@ -46,16 +43,26 @@ def show_dashboard():
     lang_code = "es" if lang == "Español" else "en"
 
     # -----------------------------
-    # TICKER + AUTOCOMPLETE
+    # TICKER + AUTOCOMPLETE + BUSCAR EMPRESA
     # -----------------------------
-    ticker = st.text_input("Ingrese ticker (ej: MSFT.US)", "MSFT.US", key="dash_ticker")
+    ticker_input = st.text_input("Ingrese ticker (ej: MSFT.US)", "MSFT.US", key="dash_ticker")
+    company_search = st.text_input("Si no conoces el ticker, busca por nombre de empresa", "")
+
+    if company_search:
+        search_results = search_ticker_by_name(company_search)  # retorna lista de tickers
+        if search_results:
+            ticker = st.selectbox("Selecciona ticker", search_results)
+        else:
+            st.warning(f"No se encontraron tickers para '{company_search}'")
+            ticker = ticker_input
+    else:
+        ticker = ticker_input
 
     # -----------------------------
     # RANGO DE FECHAS
     # -----------------------------
     range_days = st.selectbox("Rango rápido", ["1m","3m","6m","1y","5y","max"], index=0)
     custom_range = st.checkbox("Usar rango personalizado")
-
     if custom_range:
         start_date = st.date_input("Inicio", datetime.today() - timedelta(days=30))
         end_date = st.date_input("Fin", datetime.today())
@@ -142,21 +149,21 @@ def show_dashboard():
 
         st.subheader("📘 Overview General del Activo")
         card = f"""
-        **{overview['executive_summary']['name']}**  
-        Sector: {overview['executive_summary']['sector']}  
-        Industria: {overview['executive_summary']['industry']}  
-        País: {overview['executive_summary']['country']}  
+**{overview['executive_summary'].get('name','N/A')}**  
+Sector: {overview['executive_summary'].get('sector','N/A')}  
+Industria: {overview['executive_summary'].get('industry','N/A')}  
+País: {overview['executive_summary'].get('country','N/A')}  
 
-        **Valoración:**  
-        P/E: {overview['executive_summary']['valuation']['pe_ratio']} | 
-        Market Cap: {overview['executive_summary']['valuation']['market_cap']} | 
-        EPS: {overview['executive_summary']['valuation']['eps']}  
+**Valoración:**  
+P/E: {overview['executive_summary']['valuation'].get('pe_ratio','N/A')} | 
+Market Cap: {overview['executive_summary']['valuation'].get('market_cap','N/A')} | 
+EPS: {overview['executive_summary']['valuation'].get('eps','N/A')}  
 
-        **Tendencia 30d:** {overview['executive_summary']['price_trend_30d']}%  
-        **Sentimiento:** {overview['sentiment_label']}  
+**Tendencia 30d:** {overview['executive_summary'].get('price_trend_30d','N/A')}%  
+**Sentimiento:** {overview.get('sentiment_label','Sin datos')}  
 
-        **Resumen:** {overview['fundamentals_summary']}
-        """
+**Resumen:** {overview.get('fundamentals_summary','N/A')}
+"""
         st.markdown(card)
 
         # Fundamentales tabla
@@ -167,24 +174,20 @@ def show_dashboard():
         else:
             st.info("No se encontraron fundamentales válidos.")
 
-        # -----------------------------
-        # COMPETIDORES
-        # -----------------------------
+        # Competidores
         st.subheader("🏦 Competidores Reales (Industria / Sector / País)")
-        competitors = overview.get("competitors", [])
+        competitors = overview.get("competitors", [])[:5]  # limitar a 5
         if competitors:
             st.write(", ".join(competitors))
         else:
             st.info("No se encontraron competidores.")
 
-        # -----------------------------
-        # NOTICIAS + SENTIMIENTO
-        # -----------------------------
+        # Noticias + sentimiento
         st.subheader("📰 Noticias y Sentimiento")
-        news_items = overview.get("news", [])
+        news_items = overview.get("news", [])[:10]
         if news_items:
             sentiment_points = []
-            for n in news_items[:10]:
+            for n in news_items:
                 title = n.get("title", "")
                 published = n.get("published_at", "")
                 polarity, label = analyze_sentiment_textblob(title)
@@ -196,20 +199,18 @@ def show_dashboard():
                 })
                 st.write(f"- **{title}** ({published}) → *{label}* ({polarity:.2f})")
 
-            # GRÁFICO DE SENTIMIENTO
+            # GRÁFICO SIMPLIFICADO DE SENTIMIENTO
             sdf = pd.DataFrame(sentiment_points)
-            fig_s = go.Figure(go.Scatter(
-                x=sdf['date'], y=sdf['sentiment'], mode="lines+markers",
-                marker=dict(color=sdf['sentiment'].apply(lambda x: "green" if x>0 else "red" if x<0 else "gray"))
+            colors = sdf['sentiment'].apply(lambda x: "green" if x>0 else "red" if x<0 else "gray")
+            fig_s = go.Figure(go.Bar(
+                x=sdf['title'], y=sdf['sentiment'], marker_color=colors
             ))
-            fig_s.update_layout(title="Sentimiento en el tiempo", template="plotly_dark")
+            fig_s.update_layout(title="Sentimiento de noticias", template="plotly_dark", xaxis_tickangle=-45, height=300)
             st.plotly_chart(fig_s, use_container_width=True)
         else:
             st.info("No hay noticias disponibles.")
 
-        # -----------------------------
-        # ETF FINDER
-        # -----------------------------
+        # ETF Finder
         st.subheader("📈 ETF Finder (Temático)")
         tema = st.text_input("Tema (ej: AI, Energy, Metals)")
         if tema:
@@ -219,12 +220,9 @@ def show_dashboard():
             else:
                 st.info("No se encontraron ETFs temáticos.")
 
-        # -----------------------------
-        # COMPARACIÓN PRO (2 TICKERS)
-        # -----------------------------
+        # Comparación 2 tickers
         st.subheader("⚔️ Comparación entre dos tickers (FREE)")
         t2 = st.text_input("Ticker a comparar", "AAPL.US")
         if t2:
             st.write(compare_indicators(ticker, t2))
             st.write(compare_sentiment(ticker, t2))
-
