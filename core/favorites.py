@@ -6,64 +6,98 @@ FAV_PATH = "data/favorites.json"
 
 def _ensure_file():
     """
-    Crea el archivo favorites.json si no existe.
+    Garantiza que favorites.json existe y tiene estructura mínima.
     """
     os.makedirs("data", exist_ok=True)
+
     if not os.path.exists(FAV_PATH):
         with open(FAV_PATH, "w", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=2)
 
 
+def _ensure_user_structure(data, username):
+    """
+    Garantiza que el usuario tenga la estructura correcta:
+    {
+        "all": [],
+        "categories": {}
+    }
+    """
+    if username not in data:
+        data[username] = {"all": [], "categories": {}}
+
+    # Seguridad extra si el archivo estaba corrompido
+    if "all" not in data[username]:
+        data[username]["all"] = []
+
+    if "categories" not in data[username]:
+        data[username]["categories"] = {}
+
+    return data
+
+
 def load_favorites(username):
     """
-    Devuelve la lista de favoritos del usuario.
+    Devuelve favoritos con estructura:
+    {
+        "all": [tickers],
+        "categories": { "tech": ["AAPL"], ... }
+    }
     """
     _ensure_file()
-    try:
-        with open(FAV_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data.get(username, [])
-    except Exception:
-        return []
 
-
-def save_favorites(username, fav_list):
-    """
-    Guarda la lista completa de favoritos del usuario.
-    """
-    _ensure_file()
     try:
         with open(FAV_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception:
         data = {}
 
-    data[username] = fav_list
+    data = _ensure_user_structure(data, username)
+    return data[username]
+
+
+def save_favorites(username, favs):
+    """
+    Guarda estructura completa de favoritos del usuario.
+    """
+    _ensure_file()
+
+    try:
+        with open(FAV_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        data = {}
+
+    data = _ensure_user_structure(data, username)
+    data[username] = favs
 
     with open(FAV_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def add_favorite(username, item):
+def add_favorite(username, ticker):
     """
-    Agrega un favorito si no está repetido.
-    item es típicamente: {"ticker": "AAPL", "type": "stock"}
+    Agrega un ticker simple (ej. 'AAPL.US') a la lista 'all'.
+    NO usa objetos complejos para evitar errores.
     """
     favs = load_favorites(username)
 
-    # Evita duplicados usando ticker + type
-    if item not in favs:
-        favs.append(item)
+    ticker = ticker.upper()
+    if ticker not in favs["all"]:
+        favs["all"].append(ticker)
 
     save_favorites(username, favs)
     return favs
 
 
-def remove_favorite(username, item):
+def remove_favorite(username, ticker):
     """
-    Elimina un favorito.
+    Elimina un ticker.
     """
     favs = load_favorites(username)
-    favs = [f for f in favs if f != item]
+
+    ticker = ticker.upper()
+    favs["all"] = [t for t in favs["all"] if t != ticker]
+
     save_favorites(username, favs)
     return favs
