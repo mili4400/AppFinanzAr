@@ -3,6 +3,65 @@ import os
 from datetime import datetime, timedelta
 from core.eodhd_api import eod_request
 from core.cache_manager import cache_load, cache_save
+import requests
+
+API_URL = "https://www.alphavantage.co/query"
+API_KEY = "demo"   # poné tu key real
+
+def fetch_fundamentals(ticker):
+    """Devuelve fundamentals estandarizados + lista de competidores."""
+
+    # -------- FUNDAMENTALS --------
+    params = {
+        "function": "OVERVIEW",
+        "symbol": ticker,
+        "apikey": API_KEY
+    }
+
+    try:
+        r = requests.get(API_URL, params=params, timeout=10)
+        data = r.json()
+    except:
+        return {}, []
+
+    if not data or "Symbol" not in data:
+        return {}, []
+
+    # Normalizamos claves para evitar Null
+    fundamentals = {
+        "Name": data.get("Name", ""),
+        "Country": data.get("Country", ""),
+        "Sector": data.get("Sector", ""),
+        "Industry": data.get("Industry", ""),
+
+        "MarketCapitalization": safe_float(data.get("MarketCapitalization")),
+        "PERatio": safe_float(data.get("PERatio")),
+        "EPS": safe_float(data.get("EPS")),
+        "EBITDA": safe_float(data.get("EBITDA")),
+
+        "ProfitMargin": safe_float(data.get("ProfitMargin")),
+        "TotalAssets": safe_float(data.get("TotalAssets")),
+        "TotalLiabilities": safe_float(data.get("TotalLiabilities")),
+        "BookValue": safe_float(data.get("BookValue")),
+        "Description": data.get("Description", "")
+    }
+
+    # -------- COMPETIDORES --------
+    comp_list = data.get("Peer", "") or data.get("Peers", "")
+    if isinstance(comp_list, str):
+        comp_list = comp_list.split(",")
+
+    competitors = [c.strip() for c in comp_list if c.strip()]
+
+    return fundamentals, competitors
+
+
+def safe_float(v):
+    try:
+        return float(v)
+    except:
+        return None
+
 
 CACHE_PATH = "data/cache_fundamentals.json"
 CACHE_TTL_HOURS = 24
@@ -112,26 +171,3 @@ def fetch_competitors(general):
 
     return competitors
 
-
-def fetch_fundamentals(ticker):
-    # --- Cache check ---
-    cached_f, cached_c = get_cached_fundamentals(ticker)
-    if cached_f:
-        return cached_f, cached_c
-
-    # --- Queries ---
-    general = fetch_general_fundamentals(ticker)
-    income = fetch_income_statement(ticker)
-    balance = fetch_balance_sheet(ticker)
-    cash = fetch_cash_flow(ticker)
-
-    # --- Extract main metrics ---
-    fundamentals = extract_main_metrics(general, income, balance, cash)
-
-    # --- Competitors ---
-    competitors = fetch_competitors(general)
-
-    # --- Save cache ---
-    save_cached_fundamentals(ticker, fundamentals, competitors)
-
-    return fundamentals, competitors
