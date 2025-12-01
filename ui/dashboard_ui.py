@@ -150,7 +150,7 @@ def show_dashboard():
         if st.button("Cargar ejemplo demo"):
             # rellena sesión con un ticker demo para mostrar UI
             st.session_state["dash_demo_ticker"] = DEMO_TICKERS[0]
-            st.experimental_rerun()
+            st.rerun()
 
     # Top controls: Ticker input + search by company name
     st.subheader("Búsqueda de activo")
@@ -178,6 +178,16 @@ def show_dashboard():
         sel = st.selectbox("Sugerencias", DEMO_TICKERS)
         if sel:
             ticker = sel
+   # ---- FAVORITOS ------------------------------------
+    st.markdown("### ⭐ Agregar a Favoritos")
+
+    if st.button("Agregar este ticker a favoritos"):
+        try:
+            add_favorite(username, ticker)
+            st.success(f"{ticker} agregado a favoritos.")
+        except Exception as e:
+            st.error(f"No se pudo agregar: {e}")
+        st.rerun() 
 
     # Date range controls
     st.markdown("---")
