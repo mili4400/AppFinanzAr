@@ -11,6 +11,8 @@ from core.etf_finder import etf_screener
 from core.favorites import load_favorites, add_favorite
 from core.compare_pro import compare_indicators, compare_sentiment
 from core.utils import sma, ema, rsi
+from core.sentiment import analyze_sentiment_textblob
+
 
 # =============================
 # DASHBOARD PRINCIPAL
@@ -47,6 +49,15 @@ def show_dashboard():
     # Supongamos que tenés un usuario activo en session_state
     username = st.session_state.get("username", "demo")  # "demo" como fallback
     favs = load_favorites(username)
+
+    # 🔧 Asegurar estructura para evitar TypeError
+    if not favs:
+        favs = {"all": [], "categories": {}}
+    if "all" not in favs:
+        favs["all"] = []
+    if "categories" not in favs:
+        favs["categories"] = {}
+        
     MAX_FAVS = 5
 
     # Botón para agregar ticker a favoritos
@@ -126,6 +137,7 @@ def show_dashboard():
         # COMPETIDORES
         # -----------------------------
         st.subheader("🏦 Competidores Reales (Industria / Sector / País)")
+        fundamentals = fundamentals or {}
         competitors = get_competitors(ticker, fundamentals)
         if competitors:
             st.write(", ".join(competitors))
