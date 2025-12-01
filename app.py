@@ -22,11 +22,10 @@ if st.session_state.get("logged_in", False):
         st.write(f"Bienvenido, **{st.session_state.get('username','')}**")
 
         if st.button("🔒 Cerrar sesión"):
-            # Limpiar solo las claves necesarias
-            for key in ["logged_in", "username"]:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.experimental_rerun()
+            # Resetear flags de login SIN borrar toda la sesión
+            st.session_state["logged_in"] = False
+            st.session_state["username"] = ""
+            st.rerun()  # reemplaza experimental_rerun()
 
 # -----------------------------------
 # PANTALLA SEGÚN LOGIN
