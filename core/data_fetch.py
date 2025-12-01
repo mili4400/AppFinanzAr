@@ -3,9 +3,10 @@ import requests
 import pandas as pd
 from datetime import date, timedelta
 from .config import API_KEY, NEWS_DAYS_BACK
-from core.eodhd_api import fetch_eodhd
 
-
+# -----------------------------
+# OHLC HISTÓRICO
+# -----------------------------
 def fetch_ohlc(ticker, from_date=None, to_date=None):
     url = f"https://eodhistoricaldata.com/api/eod/{ticker}?api_token={API_KEY}&fmt=json"
     if from_date and to_date:
@@ -26,6 +27,9 @@ def fetch_ohlc(ticker, from_date=None, to_date=None):
     except:
         return pd.DataFrame()
 
+# -----------------------------
+# FUNDAMENTALES
+# -----------------------------
 def fetch_fundamentals(ticker):
     url = f"https://eodhistoricaldata.com/api/fundamentals/{ticker}?api_token={API_KEY}"
     try:
@@ -33,12 +37,30 @@ def fetch_fundamentals(ticker):
         if r.status_code != 200:
             return {}, []
         data = r.json()
-        fundamentals = data.get("Financials", {}).get("KeyRatios", {})
-        competitors = data.get("Competitors", [])
+        # Datos simplificados para dashboard
+        fundamentals = {
+            "Name": data.get("General", {}).get("Name"),
+            "Country": data.get("General", {}).get("Country"),
+            "Sector": data.get("General", {}).get("Sector"),
+            "Industry": data.get("General", {}).get("Industry"),
+            "MarketCapitalization": data.get("Highlights", {}).get("MarketCapitalization"),
+            "PERatio": data.get("Highlights", {}).get("PERatio"),
+            "EPS": data.get("Highlights", {}).get("EPS"),
+            "ProfitMargin": data.get("Highlights", {}).get("ProfitMargin"),
+            "EBITDA": data.get("Highlights", {}).get("EBITDA"),
+            "TotalAssets": data.get("Financials", {}).get("BalanceSheet", {}).get("totalAssets"),
+            "TotalLiabilities": data.get("Financials", {}).get("BalanceSheet", {}).get("totalLiab"),
+            "BookValue": data.get("Financials", {}).get("BalanceSheet", {}).get("totalStockholderEquity"),
+            "Description": data.get("General", {}).get("Description")
+        }
+        competitors = data.get("Competitors", [])[:5]  # máximo 5 competidores
         return fundamentals, competitors
     except:
         return {}, []
 
+# -----------------------------
+# NOTICIAS
+# -----------------------------
 def fetch_news(ticker, days_back=NEWS_DAYS_BACK, translate_to_es=True):
     today = date.today()
     start = today - timedelta(days=days_back)
@@ -59,35 +81,36 @@ def translate_text(text, target_lang="es"):
     # Placeholder: reemplazar con API real de traducción si se desea
     return text
 
-
+# -----------------------------
+# HISTÓRICO COMPATIBLE
+# -----------------------------
 def fetch_historical_data(ticker, period="1y", interval="1d"):
-    """
-    Mantiene compatibilidad con el antiguo fetch_historical_data esperado por compare.py.
-    Devuelve datos históricos OHLCV usando la función fetch_eodhd estándar
-    definida en core/eodhd_api.py
-    """
-
-    # Mapear periodos a días
-    period_map = {
-        "1m": 30,
-        "3m": 90,
-        "6m": 180,
-        "1y": 365,
-        "2y": 730,
-        "5y": 1825
-    }
-
+    period_map = {"1m":30,"3m":90,"6m":180,"1y":365,"2y":730,"5y":1825}
     days = period_map.get(period, 365)
-
-   # Llamada compatible con la nueva función fetch_eodhd
-    data = fetch_eodhd(
-        ticker,
-        interval=interval,
-        limit=days
-    )
-
+    # Llamada compatible con la nueva función fetch_eodhd
+    from core.eodhd_api import fetch_eodhd
+    data = fetch_eodhd(ticker, interval=interval, limit=days)
     if not data or not isinstance(data, list):
         return []
-
     return data
+
+# -----------------------------
+# BÚSQUEDA POR NOMBRE DE EMPRESA
+# -----------------------------
+def search_ticker_by_name(company_name, max_results=10):
+    """
+    Retorna lista de tickers que coinciden con un nombre de empresa.
+    Usa Alpha Vantage SYMBOL_SEARCH o lista local.
+    """
+    url = f"https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={company_name}&apikey={API_KEY}"
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        matches = data.get("bestMatches", [])
+        tickers = [m.get("1. symbol") for m in matches][:max_results]
+        return tickers
+    except:
+        return []
 
