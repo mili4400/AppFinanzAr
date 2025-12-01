@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 from datetime import date, timedelta
 from .config import API_KEY, NEWS_DAYS_BACK
+from core.eodhd_api import fetch_eodhd
 
 # -----------------------------
 # OHLC HISTÓRICO
@@ -37,7 +38,6 @@ def fetch_fundamentals(ticker):
         if r.status_code != 200:
             return {}, []
         data = r.json()
-        # Datos simplificados para dashboard
         fundamentals = {
             "Name": data.get("General", {}).get("Name"),
             "Country": data.get("General", {}).get("Country"),
@@ -53,7 +53,7 @@ def fetch_fundamentals(ticker):
             "BookValue": data.get("Financials", {}).get("BalanceSheet", {}).get("totalStockholderEquity"),
             "Description": data.get("General", {}).get("Description")
         }
-        competitors = data.get("Competitors", [])[:5]  # máximo 5 competidores
+        competitors = data.get("Competitors", [])[:5]  # máximo 5
         return fundamentals, competitors
     except:
         return {}, []
@@ -87,8 +87,6 @@ def translate_text(text, target_lang="es"):
 def fetch_historical_data(ticker, period="1y", interval="1d"):
     period_map = {"1m":30,"3m":90,"6m":180,"1y":365,"2y":730,"5y":1825}
     days = period_map.get(period, 365)
-    # Llamada compatible con la nueva función fetch_eodhd
-    from core.eodhd_api import fetch_eodhd
     data = fetch_eodhd(ticker, interval=interval, limit=days)
     if not data or not isinstance(data, list):
         return []
@@ -100,17 +98,14 @@ def fetch_historical_data(ticker, period="1y", interval="1d"):
 def search_ticker_by_name(company_name, max_results=10):
     """
     Retorna lista de tickers que coinciden con un nombre de empresa.
-    Usa Alpha Vantage SYMBOL_SEARCH o lista local.
+    Solo usa EODHD (no Alpha Vantage).
     """
-    url = f"https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={company_name}&apikey={API_KEY}"
+    from core.eodhd_api import eod_request
     try:
-        r = requests.get(url, timeout=10)
-        if r.status_code != 200:
+        query = f"search-symbol?query={company_name}&limit={max_results}"
+        data = eod_request(query)
+        if not data or "data" not in data:
             return []
-        data = r.json()
-        matches = data.get("bestMatches", [])
-        tickers = [m.get("1. symbol") for m in matches][:max_results]
-        return tickers
+        return [item["code"] for item in data["data"]][:max_results]
     except:
         return []
-
