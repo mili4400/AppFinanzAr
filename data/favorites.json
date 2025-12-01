@@ -1,1 +1,5 @@
-[]
+{
+  "admin": { "all": [], "categories": {} },
+  "manu": { "all": [], "categories": {} },
+  "mili": { "all": [], "categories": {} }
+}
