@@ -2,7 +2,10 @@ import json
 import os
 import streamlit as st
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "users_example.json")
+# Ruta segura y absoluta
+DATA_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "data", "users_example.json")
+)
 
 class AuthManager:
     def __init__(self):
@@ -34,9 +37,12 @@ def init_session():
         st.session_state["username"] = ""
     if "login_attempted" not in st.session_state:
         st.session_state["login_attempted"] = False
+    if "auth_manager" not in st.session_state:
+        st.session_state["auth_manager"] = AuthManager()   # cargar solo una vez
+
 
 def login_user(username, password):
-    auth = AuthManager()
+    auth = st.session_state["auth_manager"]
     st.session_state["login_attempted"] = True
 
     if auth.login(username, password):
@@ -46,3 +52,4 @@ def login_user(username, password):
     else:
         st.session_state["logged_in"] = False
         st.error("Usuario o contraseña incorrectos")
+
