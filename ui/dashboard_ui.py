@@ -11,7 +11,28 @@ from core.etf_finder import etf_screener
 from core.favorites import load_favorites, add_favorite
 from core.compare_pro import compare_indicators, compare_sentiment
 from core.utils import sma, ema, rsi
-from core.sentiment import analyze_sentiment_textblob
+# core/sentiment.py
+
+from core.sentiment_model import sentiment_score
+
+def analyze_sentiment_textblob(text: str):
+    """
+    Retrocompatibilidad: dashboard_ui espera esta función.
+    Usa el modelo transformer real, no TextBlob.
+    """
+    score = sentiment_score(text)
+
+    if score > 0.1:
+        label = "positive"
+    elif score < -0.1:
+        label = "negative"
+    else:
+        label = "neutral"
+
+    return score, label
+
+__all__ = ["analyze_sentiment_textblob", "sentiment_score"]
+
 
 
 # =============================
@@ -51,10 +72,12 @@ def show_dashboard():
     favs = load_favorites(username)
 
     # 🔧 Asegurar estructura para evitar TypeError
-    if not favs:
-        favs = {"all": [], "categories": {}}
+    if not isinstance(favs, dict):
+        favs = {"all": favs, "categories": {}}
+
     if "all" not in favs:
         favs["all"] = []
+
     if "categories" not in favs:
         favs["categories"] = {}
         
