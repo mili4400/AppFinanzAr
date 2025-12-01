@@ -93,20 +93,23 @@ def compare_pro(ticker_a, ticker_b, from_date, to_date):
         "competitors": {ticker_a: comp_a, ticker_b: comp_b},
         "sentiment": {ticker_a: sent_a, ticker_b: sent_b}
     }
-# --- Retrocompatibilidad y funciones pedidas por el dashboard ---
 
-def compare_indicators(ticker_a, ticker_b, from_date, to_date):
+# =======================================================
+# RETROCOMPATIBILIDAD PARA EL DASHBOARD
+# =======================================================
+
+def compare_indicators(ticker_a, ticker_b, from_date=None, to_date=None):
     """
-    Wrapper retrocompatible: antes existía compare_indicators.
-    Ahora simplemente llama a compare_pro.
+    Wrapper retrocompatible para el dashboard.
+    Antes existía compare_indicators.
+    Ahora simplemente usa compare_pro.
     """
     return compare_pro(ticker_a, ticker_b, from_date, to_date)
 
 
 def compare_sentiment(ticker_a, ticker_b, from_date=None, to_date=None):
     """
-    Devuelve únicamente la comparación de sentimiento.
-    Mantiene compatibilidad con la interfaz del dashboard.
+    Devuelve solo la parte de sentimiento esperada por el dashboard.
     """
     result = compare_pro(ticker_a, ticker_b, from_date, to_date)
 
