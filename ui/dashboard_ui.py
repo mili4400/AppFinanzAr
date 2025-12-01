@@ -1,17 +1,23 @@
 # ui/dashboard_ui.py
 import streamlit as st
+import plotly.graph_objects as go
 import pandas as pd
-import plotly.graph_objs as go
+from datetime import datetime, timedelta
 
 from core.data_fetch import (
-    fetch_price_history,
-    fetch_overview,
+    fetch_ohlc,
     fetch_fundamentals,
-    fetch_peers,
-    fetch_sentiment,
     fetch_news,
-    search_tickers
+    search_ticker_by_name
 )
+
+from core.overview import build_overview
+from core.etf_finder import etf_screener
+from core.favorites import load_favorites, add_favorite
+from core.compare_pro import compare_indicators, compare_sentiment
+from core.utils import sma, ema, rsi
+from core.sentiment_model import sentiment_score
+
 
 # ----------------------------------------------------
 # DEMO TICKERS (sin consumir API)
