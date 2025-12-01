@@ -49,6 +49,7 @@ def show_dashboard():
     favs = load_favorites(username)
     MAX_FAVS = 5
 
+    # Botón para agregar ticker a favoritos
     if st.sidebar.button("Agregar ticker a Favoritos"):
         tu = ticker.upper()
         if tu in favs['all']:
@@ -56,15 +57,12 @@ def show_dashboard():
         elif len(favs['all']) >= MAX_FAVS:
             st.sidebar.error("Límite alcanzado (5). Versión PRO disponible.")
         else:
-            add_favorite(username, tu)
+            add_favorite(username, tu)  # PASAR username
             st.sidebar.success(f"{tu} agregado.")
+            # recargar favoritos después de agregar
             favs = load_favorites(username)  # actualizar lista
 
-    if st.sidebar.button("Cerrar sesión"):
-        for key in st.session_state.keys():
-            del st.session_state[key]
-        st.experimental_rerun()
-
+    # Mostrar favoritos por categoría
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📂 Categorías")
     for cat, items in favs['categories'].items():
