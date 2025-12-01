@@ -148,7 +148,7 @@ def show_dashboard():
         fundamentals, competitors_data = fetch_fundamentals(ticker)
 
         st.subheader("📘 Overview General del Activo")
-        st.write(build_overview(ticker, fundamentals))
+        st.write(build_overview(ticker))
 
         st.subheader("📂 Fundamentales Clave")
         if fundamentals:
