@@ -22,9 +22,10 @@ if st.session_state.get("logged_in", False):
         st.write(f"Bienvenido, **{st.session_state.get('username','')}**")
 
         if st.button("🔒 Cerrar sesión"):
-            st.session_state["logged_in"] = False
-            st.session_state["username"] = ""
-            st.session_state.clear()
+            # Limpiar solo las claves necesarias
+            for key in ["logged_in", "username"]:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.experimental_rerun()
 
 # -----------------------------------
