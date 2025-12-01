@@ -121,3 +121,16 @@ def compare_sentiment(ticker_a, ticker_b, from_date=None, to_date=None):
 
     return result["sentiment"]
 
+# --- Retrocompatibilidad para dashboard ---
+def compare_indicators(ticker_a, ticker_b, from_date=None, to_date=None):
+    """Alias retrocompatible para compare_pro"""
+    return compare_pro(ticker_a, ticker_b, from_date, to_date)
+
+def compare_sentiment(ticker_a, ticker_b, from_date=None, to_date=None):
+    """Devuelve solo la parte de sentimiento"""
+    result = compare_pro(ticker_a, ticker_b, from_date, to_date)
+    if not result or "sentiment" not in result:
+        return {ticker_a: None, ticker_b: None}
+    return result["sentiment"]
+
+
