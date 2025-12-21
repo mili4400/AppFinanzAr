@@ -127,21 +127,38 @@ def show_dashboard():
         to_remove = None
 
         for f in st.session_state.favorites:
-            label, color = PRICE_ALERTS.get(f, ("", "#FFFFFF"))
             col1, col2 = st.columns([5, 1])
             with col1:
                 st.markdown(
-                    f"<span style='color:{color}; font-weight:600'>• {f} {label}</span>",
+                    f"<span style='color:white;font-weight:600'>• {f}</span>",
                     unsafe_allow_html=True
                 )
             with col2:
-                if st.button("❌", key=f"fav_del_{f}"):
-                    to_remove = f
+                if st.button("❌", key=f"del_{f}"):
+                    remove_candidate = f
 
-        if to_remove:
-            st.session_state.favorites.remove(to_remove)
-            st.success(f"{to_remove} eliminado de favoritos")
+        if remove_candidate:
+            st.session_state.confirm_fav = remove_candidate
 
+        if "confirm_fav" in st.session_state:
+            f = st.session_state.confirm_fav
+            st.warning(f"¿Eliminar {f}?")
+            c1, c2 = st.columns(2)
+            if c1.button("Sí"):
+                st.session_state.favorites.remove(f)
+                del st.session_state.confirm_fav
+            if c2.button("Cancelar"):
+                del st.session_state.confirm_fav
+
+        if st.session_state.favorites:
+            if st.button("🗑️ Eliminar todos"):
+                st.session_state.confirm_all = True
+
+        if st.session_state.get("confirm_all"):
+            st.error("¿Eliminar TODOS los favoritos?")
+            if st.button("Confirmar"):
+                st.session_state.favorites = []
+                del st.session_state.confirm_all
 
         if st.session_state.favorites:
             csv = pd.DataFrame(st.session_state.favorites, columns=["Ticker"]).to_csv(index=False)
@@ -163,8 +180,10 @@ def show_dashboard():
 
     if st.button("⭐ Agregar a favoritos"):
         if ticker not in st.session_state.favorites:
-            st.session_state.favorites.append(ticker)
-            st.success("Agregado correctamente")
+            st.session_state["favorites"].append(ticker)
+            add_favorite(username, st.session_state["favorites"])
+            st.toast(f"{ticker} agregado a favoritos", icon="⭐")
+            
 
     # =====================================================
     # RANGO DE FECHAS
