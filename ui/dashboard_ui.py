@@ -124,7 +124,8 @@ def show_dashboard():
 
         st.subheader("⭐ Favoritos")
 
-        to_remove = None
+        # 🔧 inicialización segura
+        remove_candidate = None  
 
         for f in st.session_state.favorites:
             col1, col2 = st.columns([5, 1])
@@ -137,28 +138,35 @@ def show_dashboard():
                 if st.button("❌", key=f"del_{f}"):
                     remove_candidate = f
 
-        if remove_candidate:
+        # Confirmación individual
+        if remove_candidate is not None:
             st.session_state.confirm_fav = remove_candidate
 
         if "confirm_fav" in st.session_state:
             f = st.session_state.confirm_fav
-            st.warning(f"¿Eliminar {f}?")
+            st.warning(f"¿Eliminar {f} de favoritos?")
             c1, c2 = st.columns(2)
-            if c1.button("Sí"):
+            if c1.button("Sí, eliminar"):
                 st.session_state.favorites.remove(f)
                 del st.session_state.confirm_fav
+                st.experimental_rerun()
             if c2.button("Cancelar"):
                 del st.session_state.confirm_fav
 
+        # Eliminar todos
         if st.session_state.favorites:
-            if st.button("🗑️ Eliminar todos"):
+            if st.button("🗑️ Eliminar todos los favoritos"):
                 st.session_state.confirm_all = True
 
         if st.session_state.get("confirm_all"):
             st.error("¿Eliminar TODOS los favoritos?")
-            if st.button("Confirmar"):
+            c1, c2 = st.columns(2)
+            if c1.button("Confirmar"):
                 st.session_state.favorites = []
                 del st.session_state.confirm_all
+                st.experimental_rerun()
+            if c2.button("Cancelar"):
+                del st.session_state.confirm_all 
 
         if st.session_state.favorites:
             csv = pd.DataFrame(st.session_state.favorites, columns=["Ticker"]).to_csv(index=False)
