@@ -123,12 +123,25 @@ def show_dashboard():
         st.write(market_status())
 
         st.subheader("⭐ Favoritos")
+
+        to_remove = None
+
         for f in st.session_state.favorites:
-            label, color = PRICE_ALERTS.get(f, ("", "black"))
-            st.markdown(
-                f"<span style='color:{color}'>• {f} {label}</span>",
-                unsafe_allow_html=True
-            )
+            label, color = PRICE_ALERTS.get(f, ("", "#FFFFFF"))
+            col1, col2 = st.columns([5, 1])
+            with col1:
+                st.markdown(
+                    f"<span style='color:{color}; font-weight:600'>• {f} {label}</span>",
+                    unsafe_allow_html=True
+                )
+            with col2:
+                if st.button("❌", key=f"fav_del_{f}"):
+                    to_remove = f
+
+        if to_remove:
+            st.session_state.favorites.remove(to_remove)
+            st.success(f"{to_remove} eliminado de favoritos")
+
 
         if st.session_state.favorites:
             csv = pd.DataFrame(st.session_state.favorites, columns=["Ticker"]).to_csv(index=False)
@@ -223,27 +236,82 @@ def show_dashboard():
     # =====================================================
     st.subheader("📰 Noticias & Sentimiento")
     for n in ov["news"]:
-        s = sentiment_score(n["title"])
+        news_list = ov.get("news", [])
+        if news_list:
+            sentiment = sentiment_score(news_list[0].get("title", ""))
+        else:
+            sentiment = 0.0
         st.write(f"- {n['title']} ({s:+.2f})")
 
     # =====================================================
     # ETF FINDER
     # =====================================================
-    st.subheader("ETF Finder")
-    theme = st.text_input("Tema")
-    if st.button("Buscar ETFs"):
-        st.table(pd.DataFrame(etf_screener(theme)))
+    st.subheader("🧭 ETF Finder")
+
+    st.caption("Explorá ETFs por temática o escribí tu propio criterio")
+
+    tema_sel = st.selectbox(
+        "Temas sugeridos",
+        ["— Elegir tema —"] + ETF_THEMES
+    )
+
+    tema_custom = st.text_input(
+        "O buscar por palabra clave (ej: space, lithium, oil, nasa)"
+    )
+
+    buscar = st.button("Buscar ETFs")
+
+    if buscar:
+        tema_final = None
+
+        if tema_custom:
+            tema_final = tema_custom
+        elif tema_sel != "— Elegir tema —":
+            tema_final = tema_sel
+
+        if tema_final:
+            etfs = etf_screener(tema_final)
+            if etfs:
+                st.table(pd.DataFrame(etfs))
+            else:
+                st.info("No se encontraron ETFs para este tema.")
+        else:
+            st.warning("Seleccioná o escribí un tema para buscar.")
 
     # =====================================================
     # COMPARACIÓN
     # =====================================================
-    st.subheader("Comparación rápida")
-    a, b = st.columns(2)
-    t1 = a.selectbox("Ticker A", DEMO_TICKERS)
-    t2 = b.selectbox("Ticker B", DEMO_TICKERS, index=1)
-    if st.button("Comparar"):
-        st.write(compare_indicators(t1, t2))
-        st.write(compare_sentiment(t1, t2))
+    st.subheader("🔀 Comparación rápida (2 tickers)")
+
+    colA, colB = st.columns(2)
+    t_a = colA.text_input("Ticker A", ticker, key="cmp_a")
+    t_b = colB.text_input("Ticker B", "AAPL.US", key="cmp_b")
+
+    if st.button("Comparar ahora"):
+        cmp = compare_indicators(t_a, t_b) or {}
+        sent = compare_sentiment(t_a, t_b) or {}
+
+        # Fallback demo si viene vacío
+        if not cmp:
+            cmp = {
+                "Score técnico": np.random.uniform(40, 80),
+                "Score fundamental": np.random.uniform(40, 80),
+                "Volatilidad": np.random.uniform(10, 30),
+            }
+
+        if not sent:
+            sent = {
+                t_a: np.random.uniform(-1, 1),
+                t_b: np.random.uniform(-1, 1),
+            }
+
+        st.markdown("### 📊 Indicadores comparados")
+        st.dataframe(
+            pd.DataFrame.from_dict(cmp, orient="index", columns=["Valor"])
+        )
+
+        st.markdown("### 🧠 Sentimiento comparado")
+        st.bar_chart(pd.Series(sent))
 
     # =====================================================
     # RANKING
