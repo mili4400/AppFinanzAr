@@ -112,8 +112,19 @@ def global_score(trend, sentiment):
 def show_dashboard():
     st.title("📊 AppFinanzAr")
 
+    # ==============================
+    # Session state seguro por usuario
+    # ==============================
+    current_user = st.session_state.get("username", "demo")
+
     if "favorites" not in st.session_state:
         st.session_state.favorites = []
+
+    if st.session_state.get("_active_user") != current_user:
+        # Cambio de usuario → limpiar estado sensible
+        st.session_state.favorites = []
+        st.session_state._active_user = current_user
+
 
     # =====================================================
     # SIDEBAR
@@ -245,7 +256,14 @@ def show_dashboard():
     ov = build_overview(ticker)
     es = ov["executive_summary"]
 
-    sentiment = sentiment_score(ov["news"][0]["title"])
+    
+    news_list = ov.get("news", [])
+
+    if news_list and isinstance(news_list, list):
+        sentiment = sentiment_score(news_list[0].get("title", ""))
+    else:
+        sentiment = 0.0
+
     score = global_score(es["price_trend_30d"], sentiment)
 
     st.subheader("📋 Resumen Ejecutivo")
