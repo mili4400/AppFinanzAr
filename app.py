@@ -22,10 +22,20 @@ if st.session_state.get("logged_in", False):
         st.write(f"Bienvenido, **{st.session_state.get('username','')}**")
 
         if st.button("🔒 Cerrar sesión"):
-            # Resetear flags de login SIN borrar toda la sesión
+            # --- reset login ---
             st.session_state["logged_in"] = False
             st.session_state["username"] = ""
-            st.rerun()  # reemplaza experimental_rerun()
+
+            # --- reset estados del dashboard ---
+            for k in [
+                "favorites",
+                "confirm_delete_one",
+                "confirm_delete_all",
+            ]:
+                if k in st.session_state:
+                    del st.session_state[k]
+
+            st.rerun()
 
 # -----------------------------------
 # PANTALLA SEGÚN LOGIN
