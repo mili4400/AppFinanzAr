@@ -100,8 +100,15 @@ def demo_overview(ticker):
 def show_dashboard():
     st.title("📊 AppFinanzAr — Demo Profesional")
 
+    # ====== SESSION STATE LIMPIO ======
     if "favorites" not in st.session_state:
         st.session_state.favorites = []
+
+    if "confirm_delete_one" not in st.session_state:
+        st.session_state.confirm_delete_one = None
+
+    if "confirm_delete_all" not in st.session_state:
+        st.session_state.confirm_delete_all = False
 
     # ================= SIDEBAR DERECHA =================
     with st.sidebar:
@@ -112,35 +119,72 @@ def show_dashboard():
         st.subheader("⭐ Favoritos")
 
         if st.session_state.favorites:
-            remove_one = None
 
+            # ---- LISTA ----
             for f in st.session_state.favorites:
-                label, color = PRICE_ALERTS.get(f, ("", "#ffffff"))
-                c1, c2 = st.columns([5,1])
+                c1, c2 = st.columns([6,1])
+
                 with c1:
-                    st.markdown(
-                        f"<span style='color:{color};font-weight:600'>• {f} {label}</span>",
-                        unsafe_allow_html=True
-                    )
+                    st.write(f"• {f}")
+
                 with c2:
-                    if st.button("❌", key=f"del_{f}"):
-                        remove_one = f
+                    if st.button("❌", key=f"ask_del_{f}"):
+                        st.session_state.confirm_delete_one = f
+                        st.session_state.confirm_delete_all = False
 
-            if remove_one:
-                if st.confirm(f"¿Eliminar {remove_one} de favoritos?"):
-                    st.session_state.favorites.remove(remove_one)
+            st.divider()
 
-            if st.confirm("🗑️ Eliminar TODOS los favoritos"):
-                st.session_state.favorites = []
+            # ---- ELIMINAR TODOS ----
+            if st.button("🧹 Eliminar todos"):
+                st.session_state.confirm_delete_all = True
+                st.session_state.confirm_delete_one = None
 
-            csv = pd.DataFrame(st.session_state.favorites, columns=["Ticker"]).to_csv(index=False)
-            st.download_button("⬇ Exportar CSV", csv, "favoritos.csv")
+            # ---- CONFIRMAR ELIMINAR UNO ----
+            if st.session_state.confirm_delete_one:
+                st.warning(
+                    f"¿Eliminar {st.session_state.confirm_delete_one} de favoritos?"
+                )
+
+                c_yes, c_no = st.columns(2)
+
+                if c_yes.button("✅ Sí, eliminar"):
+                    st.session_state.favorites.remove(
+                        st.session_state.confirm_delete_one
+                    )
+                    st.session_state.confirm_delete_one = None
+
+                if c_no.button("↩ Cancelar"):
+                    st.session_state.confirm_delete_one = None
+
+            # ---- CONFIRMAR ELIMINAR TODOS ----
+            if st.session_state.confirm_delete_all:
+                st.error("⚠️ ¿Eliminar TODOS los favoritos?")
+
+                c_yes, c_no = st.columns(2)
+
+                if c_yes.button("🔥 Sí, eliminar todo"):
+                    st.session_state.favorites = []
+                    st.session_state.confirm_delete_all = False
+
+                if c_no.button("↩ Cancelar"):
+                    st.session_state.confirm_delete_all = False
+
+            st.divider()
+
+            # ---- EXPORT CSV ----
+            csv = pd.DataFrame(
+                st.session_state.favorites,
+                columns=["Ticker"]
+            ).to_csv(index=False)
+
+            st.download_button(
+                "⬇ Exportar favoritos",
+                csv,
+                "favoritos.csv"
+            )
+
         else:
             st.caption("Sin favoritos aún")
-
-        if st.session_state.favorites:
-            csv = pd.DataFrame(st.session_state.favorites, columns=["Ticker"]).to_csv(index=False)
-            st.download_button("⬇ Exportar favoritos", csv, "favoritos.csv")
         
         st.markdown("---")
         st.subheader("🏢 Buscar por empresa (demo)")
@@ -161,10 +205,15 @@ def show_dashboard():
         return
 
     # ================= FAVORITOS =================
-    if st.button("⭐ Agregar a favoritos"):
-        if ticker not in st.session_state.favorites:
+    def add_favorite():
+        if ticker and ticker not in st.session_state.favorites:
             st.session_state.favorites.append(ticker)
-            st.success("Agregado a favoritos")
+
+    st.button(
+        "⭐ Agregar a favoritos",
+        on_click=add_favorite,
+        key="add_fav_btn"
+    )
 
     # ================= DATOS & GRÁFICO =================
     df = demo_ohlc()
