@@ -138,6 +138,10 @@ def show_dashboard():
         else:
             st.caption("Sin favoritos aún")
 
+        if st.session_state.favorites:
+            csv = pd.DataFrame(st.session_state.favorites, columns=["Ticker"]).to_csv(index=False)
+            st.download_button("⬇ Exportar favoritos", csv, "favoritos.csv")
+        
         st.markdown("---")
         st.subheader("🏢 Buscar por empresa (demo)")
         st.caption("Ej: Microsoft, Apple, Google")
