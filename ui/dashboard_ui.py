@@ -1,242 +1,172 @@
 # ui/dashboard_ui.py
 import streamlit as st
-import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-import io
+import plotly.graph_objects as go
 from datetime import datetime, timedelta, time
 
-# =========================================================
-# CONFIG
-# =========================================================
-st.set_page_config(page_title="AppFinanzAr", layout="wide")
+# ======================================================
+# CONFIG GLOBAL
+# ======================================================
+st.set_page_config(
+    page_title="AppFinanzAr",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# =========================================================
-# SAFE IMPORTS + FALLBACKS
-# =========================================================
-try:
-    from core.data_fetch import fetch_ohlc, fetch_fundamentals, fetch_news, search_ticker_by_name
-except Exception:
-    def fetch_ohlc(*args, **kwargs): return pd.DataFrame()
-    def fetch_fundamentals(t): return {}, []
-    def fetch_news(t, *a, **k): return []
-    def search_ticker_by_name(name): return []
+st.markdown(
+    """
+    <style>
+    body { background-color: #0e1117; color: #ffffff; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-try:
-    from core.overview import build_overview
-except Exception:
-    def build_overview(ticker, lang="es"):
-        prices = 100 + np.cumsum(np.random.randn(120))
-        df = pd.DataFrame({
-            "date": pd.date_range(end=datetime.today(), periods=len(prices)),
-            "close": prices
-        })
-        return {
-            "executive_summary": {
-                "name": ticker,
-                "sector": "Technology",
-                "industry": "Software",
-                "country": "USA",
-                "valuation": {"pe_ratio": 25, "market_cap": "1T", "eps": 5},
-                "price_trend_30d": np.random.uniform(-6, 6)
-            },
-            "fundamentals": {"Revenue": "1000M", "Profit": "200M", "Debt": "Low"},
-            "competitors": ["AAPL", "GOOGL", "AMZN"],
-            "news": [{"title": "Demo news positive outlook", "published_at": str(datetime.today())}],
-            "sentiment_label": "Neutral",
-            "fundamentals_summary": "Empresa sólida con crecimiento estable."
-        }
-
-try:
-    from core.etf_finder import etf_screener
-except Exception:
-    def etf_screener(theme=None):
-        return [{"ETF": "TECHETF", "Theme": theme or "General"}]
-
-try:
-    from core.compare_pro import compare_indicators, compare_sentiment
-except Exception:
-    def compare_indicators(a, b): return {"Momentum": 0.6, "Volatility": 0.3}
-    def compare_sentiment(a, b): return {"A": 0.2, "B": -0.1}
-
-try:
-    from core.utils import sma, ema, rsi
-except Exception:
-    def sma(s, n): return s.rolling(n).mean()
-    def ema(s, n): return s.ewm(span=n).mean()
-    def rsi(s, n):
-        delta = s.diff()
-        gain = delta.clip(lower=0).rolling(n).mean()
-        loss = -delta.clip(upper=0).rolling(n).mean()
-        rs = gain / loss
-        return 100 - (100 / (1 + rs))
-
-try:
-    from core.sentiment_model import sentiment_score
-except Exception:
-    def sentiment_score(t):
-        t = (t or "").lower()
-        if "positive" in t or "up" in t: return 0.6
-        if "negative" in t or "down" in t: return -0.6
-        return 0.0
-
-# =========================================================
+# ======================================================
 # CONSTANTES DEMO
-# =========================================================
+# ======================================================
 DEMO_TICKERS = ["MSFT.US", "AAPL.US", "GOOGL.US", "AMZN.US", "GGAL.BA"]
 
+ETF_THEMES = [
+    "Technology", "Energy", "Healthcare", "Lithium",
+    "Artificial Intelligence", "Fintech", "Space / NASA"
+]
+
 PRICE_ALERTS = {
-    "MSFT.US": ("Precio muy alto", "green"),
-    "GGAL.BA": ("Precio muy bajo", "red")
+    "MSFT.US": ("Precio excesivamente alto", "#00ff99"),
+    "GGAL.BA": ("Precio muy bajo", "#ff4d4d")
 }
 
-# =========================================================
-# HELPERS
-# =========================================================
+# ======================================================
+# HELPERS DEMO
+# ======================================================
 def market_status():
     now = datetime.now().time()
-    open_time = time(9, 30)
-    close_time = time(16, 0)
-    if open_time <= now <= close_time:
+    if time(9,30) <= now <= time(16,0):
         return "🟢 Mercado abierto"
-    if now < open_time:
+    if now < time(9,30):
         return "🟡 Abre en menos de 1h"
     return "🔴 Mercado cerrado"
 
+def demo_ohlc(days=180):
+    dates = pd.date_range(end=datetime.today(), periods=days)
+    price = 100 + np.cumsum(np.random.randn(days))
+    return pd.DataFrame({
+        "date": dates,
+        "open": price - 1,
+        "high": price + 1,
+        "low": price - 2,
+        "close": price
+    })
+
+def sma(s, n): return s.rolling(n).mean()
+def ema(s, n): return s.ewm(span=n).mean()
+
+def sentiment_score(text):
+    return np.random.uniform(-1, 1)
+
 def global_score(trend, sentiment):
-    return round((trend * 0.6 + sentiment * 40), 2)
+    return round(trend * 0.6 + sentiment * 40, 2)
 
-# =========================================================
+def demo_overview(ticker):
+    trend = np.random.uniform(-6, 6)
+    sentiment = np.random.uniform(-1, 1)
+    return {
+        "executive": {
+            "name": ticker,
+            "sector": "Technology",
+            "industry": "Software",
+            "country": "USA",
+            "trend": trend,
+            "score": global_score(trend, sentiment)
+        },
+        "fundamentals": {
+            "Revenue": "1200M",
+            "Profit": "260M",
+            "Debt": "Low",
+            "ROE": "18%"
+        },
+        "competitors": ["AAPL", "GOOGL", "AMZN"],
+        "news": [
+            {"title": "Strong growth outlook expected", "sentiment": sentiment_score("")},
+            {"title": "Analysts remain cautious short-term", "sentiment": sentiment_score("")}
+        ]
+    }
+
+# ======================================================
 # DASHBOARD
-# =========================================================
+# ======================================================
 def show_dashboard():
-    st.title("📊 AppFinanzAr")
-
-    # ==============================
-    # Session state seguro por usuario
-    # ==============================
-    current_user = st.session_state.get("username", "demo")
+    st.title("📊 AppFinanzAr — Demo Profesional")
 
     if "favorites" not in st.session_state:
         st.session_state.favorites = []
 
-    if st.session_state.get("_active_user") != current_user:
-        # Cambio de usuario → limpiar estado sensible
-        st.session_state.favorites = []
-        st.session_state._active_user = current_user
-
-
-    # =====================================================
-    # SIDEBAR
-    # =====================================================
+    # ================= SIDEBAR DERECHA =================
     with st.sidebar:
-        st.subheader("🕒 Mercado")
+        st.subheader("🕒 Estado del mercado")
         st.write(market_status())
 
+        st.markdown("---")
         st.subheader("⭐ Favoritos")
 
-        # 🔧 inicialización segura
-        remove_candidate = None  
-
-        for f in st.session_state.favorites:
-            col1, col2 = st.columns([5, 1])
-            with col1:
-                st.markdown(
-                    f"<span style='color:white;font-weight:600'>• {f}</span>",
-                    unsafe_allow_html=True
-                )
-            with col2:
-                if st.button("❌", key=f"del_{f}"):
-                    remove_candidate = f
-
-        # Confirmación individual
-        if remove_candidate is not None:
-            st.session_state.confirm_fav = remove_candidate
-
-        if "confirm_fav" in st.session_state:
-            f = st.session_state.confirm_fav
-            st.warning(f"¿Eliminar {f} de favoritos?")
-            c1, c2 = st.columns(2)
-            if c1.button("Sí, eliminar"):
-                st.session_state.favorites.remove(f)
-                del st.session_state.confirm_fav
-                st.experimental_rerun()
-            if c2.button("Cancelar"):
-                del st.session_state.confirm_fav
-
-        # Eliminar todos
         if st.session_state.favorites:
-            if st.button("🗑️ Eliminar todos los favoritos"):
-                st.session_state.confirm_all = True
+            remove_one = None
 
-        if st.session_state.get("confirm_all"):
-            st.error("¿Eliminar TODOS los favoritos?")
-            c1, c2 = st.columns(2)
-            if c1.button("Confirmar"):
+            for f in st.session_state.favorites:
+                label, color = PRICE_ALERTS.get(f, ("", "#ffffff"))
+                c1, c2 = st.columns([5,1])
+                with c1:
+                    st.markdown(
+                        f"<span style='color:{color};font-weight:600'>• {f} {label}</span>",
+                        unsafe_allow_html=True
+                    )
+                with c2:
+                    if st.button("❌", key=f"del_{f}"):
+                        remove_one = f
+
+            if remove_one:
+                if st.confirm(f"¿Eliminar {remove_one} de favoritos?"):
+                    st.session_state.favorites.remove(remove_one)
+
+            if st.confirm("🗑️ Eliminar TODOS los favoritos"):
                 st.session_state.favorites = []
-                del st.session_state.confirm_all
-                st.experimental_rerun()
-            if c2.button("Cancelar"):
-                del st.session_state.confirm_all 
 
-        if st.session_state.favorites:
             csv = pd.DataFrame(st.session_state.favorites, columns=["Ticker"]).to_csv(index=False)
-            st.download_button("⬇ Exportar favoritos", csv, "favoritos.csv")
+            st.download_button("⬇ Exportar CSV", csv, "favoritos.csv")
+        else:
+            st.caption("Sin favoritos aún")
 
         st.markdown("---")
-        st.subheader("Buscar empresa")
-        company = st.text_input("Nombre empresa")
-        if company:
-            res = search_ticker_by_name(company)
-            if res:
-                st.write(res)
+        st.subheader("🏢 Buscar por empresa (demo)")
+        st.caption("Ej: Microsoft, Apple, Google")
+        st.write(DEMO_TICKERS)
 
-    # =====================================================
-    # SELECCIÓN TICKER
-    # =====================================================
+    # ================= SELECCIÓN CENTRAL =================
     st.subheader("Selección de activo")
-    ticker = st.selectbox("Ticker (demo incluido)", DEMO_TICKERS)
 
+    ticker = st.selectbox(
+        "Elegí un ticker para comenzar",
+        [""] + DEMO_TICKERS,
+        index=0
+    )
+
+    if ticker == "":
+        st.info("👆 Seleccioná un activo para ver el dashboard")
+        return
+
+    # ================= FAVORITOS =================
     if st.button("⭐ Agregar a favoritos"):
         if ticker not in st.session_state.favorites:
-            st.session_state["favorites"].append(ticker)
-            add_favorite(username, st.session_state["favorites"])
-            st.toast(f"{ticker} agregado a favoritos", icon="⭐")
-            
+            st.session_state.favorites.append(ticker)
+            st.success("Agregado a favoritos")
 
-    # =====================================================
-    # RANGO DE FECHAS
-    # =====================================================
-    st.subheader("Rango de análisis")
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.date_input("Desde", datetime.today() - timedelta(days=90))
-    with col2:
-        end_date = st.date_input("Hasta", datetime.today())
-
-    # =====================================================
-    # DATA OHLC
-    # =====================================================
-    df = fetch_ohlc(ticker, start_date, end_date)
-    if df.empty:
-        idx = pd.date_range(start=start_date, end=end_date)
-        price = 100 + np.cumsum(np.random.randn(len(idx)))
-        df = pd.DataFrame({
-            "date": idx,
-            "open": price - 1,
-            "high": price + 1,
-            "low": price - 2,
-            "close": price
-        })
-
+    # ================= DATOS & GRÁFICO =================
+    df = demo_ohlc()
     df["SMA20"] = sma(df["close"], 20)
     df["EMA20"] = ema(df["close"], 20)
-    df["RSI14"] = rsi(df["close"], 14)
 
-    # =====================================================
-    # GRÁFICO
-    # =====================================================
-    st.subheader("📈 Precio e indicadores")
     fig = go.Figure()
     fig.add_candlestick(
         x=df["date"],
@@ -250,123 +180,57 @@ def show_dashboard():
     fig.add_scatter(x=df["date"], y=df["EMA20"], name="EMA20")
     st.plotly_chart(fig, use_container_width=True)
 
-    # =====================================================
-    # OVERVIEW
-    # =====================================================
-    ov = build_overview(ticker)
-    es = ov["executive_summary"]
-
-    
-    news_list = ov.get("news", [])
-
-    if news_list and isinstance(news_list, list):
-        sentiment = sentiment_score(news_list[0].get("title", ""))
-    else:
-        sentiment = 0.0
-
-    score = global_score(es["price_trend_30d"], sentiment)
+    # ================= OVERVIEW =================
+    ov = demo_overview(ticker)
 
     st.subheader("📋 Resumen Ejecutivo")
-    st.metric("Score Global", score)
-    st.write(es)
+    st.metric("Score Global", ov["executive"]["score"])
+    st.json(ov["executive"])
 
-    st.subheader("Fundamentales")
+    st.subheader("📊 Fundamentales")
     st.table(pd.DataFrame.from_dict(ov["fundamentals"], orient="index", columns=["Valor"]))
 
-    st.subheader("Competidores")
+    st.subheader("🏭 Competidores")
     st.write(", ".join(ov["competitors"]))
 
-    # =====================================================
-    # NOTICIAS
-    # =====================================================
+    # ================= NOTICIAS =================
     st.subheader("📰 Noticias & Sentimiento")
     for n in ov["news"]:
-        news_list = ov.get("news", [])
-        if news_list:
-            sentiment = sentiment_score(news_list[0].get("title", ""))
-        else:
-            sentiment = 0.0
-        st.write(f"- {n['title']} ({s:+.2f})")
+        label = "📈 Positivo" if n["sentiment"] > 0 else "📉 Negativo"
+        st.write(f"- {n['title']} — {label}")
 
-    # =====================================================
-    # ETF FINDER
-    # =====================================================
+    # ================= ETF FINDER =================
     st.subheader("🧭 ETF Finder")
+    tema = st.selectbox("Tema", ETF_THEMES)
+    if st.button("Buscar ETFs"):
+        st.table(pd.DataFrame([
+            {"ETF": "DEMO-ETF-1", "Tema": tema},
+            {"ETF": "DEMO-ETF-2", "Tema": tema}
+        ]))
 
-    st.caption("Explorá ETFs por temática o escribí tu propio criterio")
+    # ================= COMPARACIÓN =================
+    st.subheader("🔀 Comparación rápida")
+    c1, c2 = st.columns(2)
+    t1 = c1.selectbox("Ticker A", DEMO_TICKERS, index=0)
+    t2 = c2.selectbox("Ticker B", DEMO_TICKERS, index=1)
 
-    tema_sel = st.selectbox(
-        "Temas sugeridos",
-        ["— Elegir tema —"] + ETF_THEMES
-    )
+    if st.button("Comparar"):
+        st.bar_chart({
+            t1: np.random.uniform(40, 80),
+            t2: np.random.uniform(40, 80)
+        })
 
-    tema_custom = st.text_input(
-        "O buscar por palabra clave (ej: space, lithium, oil, nasa)"
-    )
-
-    buscar = st.button("Buscar ETFs")
-
-    if buscar:
-        tema_final = None
-
-        if tema_custom:
-            tema_final = tema_custom
-        elif tema_sel != "— Elegir tema —":
-            tema_final = tema_sel
-
-        if tema_final:
-            etfs = etf_screener(tema_final)
-            if etfs:
-                st.table(pd.DataFrame(etfs))
-            else:
-                st.info("No se encontraron ETFs para este tema.")
-        else:
-            st.warning("Seleccioná o escribí un tema para buscar.")
-
-    # =====================================================
-    # COMPARACIÓN
-    # =====================================================
-    st.subheader("🔀 Comparación rápida (2 tickers)")
-
-    colA, colB = st.columns(2)
-    t_a = colA.text_input("Ticker A", ticker, key="cmp_a")
-    t_b = colB.text_input("Ticker B", "AAPL.US", key="cmp_b")
-
-    if st.button("Comparar ahora"):
-        cmp = compare_indicators(t_a, t_b) or {}
-        sent = compare_sentiment(t_a, t_b) or {}
-
-        # Fallback demo si viene vacío
-        if not cmp:
-            cmp = {
-                "Score técnico": np.random.uniform(40, 80),
-                "Score fundamental": np.random.uniform(40, 80),
-                "Volatilidad": np.random.uniform(10, 30),
-            }
-
-        if not sent:
-            sent = {
-                t_a: np.random.uniform(-1, 1),
-                t_b: np.random.uniform(-1, 1),
-            }
-
-        st.markdown("### 📊 Indicadores comparados")
-        st.dataframe(
-            pd.DataFrame.from_dict(cmp, orient="index", columns=["Valor"])
-        )
-
-        st.markdown("### 🧠 Sentimiento comparado")
-        st.bar_chart(pd.Series(sent))
-
-    # =====================================================
-    # RANKING
-    # =====================================================
+    # ================= RANKING =================
     st.subheader("🏆 Ranking de oportunidades")
     ranking = []
     for t in DEMO_TICKERS:
-        tr = np.random.uniform(-5, 5)
-        se = np.random.uniform(-0.5, 0.5)
-        ranking.append({"Ticker": t, "Score": global_score(tr, se)})
+        ranking.append({
+            "Ticker": t,
+            "Score": global_score(
+                np.random.uniform(-5,5),
+                np.random.uniform(-1,1)
+            )
+        })
     st.table(pd.DataFrame(ranking).sort_values("Score", ascending=False))
 
-    st.caption("Modo demo – datos simulados y educativos")
+    st.caption("Modo DEMO 100% — datos simulados con fines demostrativos")
