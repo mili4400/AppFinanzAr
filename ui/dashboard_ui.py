@@ -41,8 +41,8 @@ COMPANY_TO_TICKER = {
     "Google": "GOOGL.US",
     "Amazon": "AMZN.US",
     "Galicia": "GGAL.BA",
-    "BTC.CRYPTO",
-    "ETH.CRYPTO"
+    "Bitcoin": "BTC.CRYPTO",
+    "Ethereum": "ETH.CRYPTO",
 }
 
 ETF_THEMES = [
