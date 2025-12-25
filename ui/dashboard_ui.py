@@ -224,20 +224,33 @@ def show_dashboard():
         )
 
         if company_name:
-            ticker_found = COMPANY_TO_TICKER.get(company_name.strip())
+            matches = [
+                name for name in COMPANY_TO_TICKER.keys()
+                if company_name.lower() in name.lower()
+            ]
 
-            if ticker_found:
+            if len(matches) == 1:
+                ticker_found = COMPANY_TO_TICKER[matches[0]]
                 st.success(f"Ticker encontrado: {ticker_found}")
                 st.session_state.selected_ticker = ticker_found
+
+            elif len(matches) > 1:
+                st.info("Coincidencias encontradas:")
+                company_selected = st.selectbox("Seleccioná una", matches)
+
+                ticker_found = COMPANY_TO_TICKER[company_selected]
+                st.session_state.selected_ticker = ticker_found
+
             else:
-                st.warning("Empresa no encontrada (demo)")
+                st.warning("Empresa no encontrada (solo tickers demo disponibles)")
+
                 
 
     # ================= SELECCIÓN CENTRAL =================
     st.subheader("Selección de activo")
 
     if "selected_ticker" not in st.session_state:
-    st.session_state.selected_ticker = ""
+        st.session_state.selected_ticker = ""
 
     ticker = st.selectbox(
         "Elegí un ticker para comenzar",
@@ -256,7 +269,7 @@ def show_dashboard():
             user = st.session_state.get("username")
             persist_add_favorite(user, ticker)
             st.session_state.favorites.append(ticker)
-            st.rerun()
+        
 
     st.button(
         "⭐ Agregar a favoritos",
