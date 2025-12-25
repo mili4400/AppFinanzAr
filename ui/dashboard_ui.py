@@ -4,6 +4,13 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime, timedelta, time
+from core.favorites import (
+    load_favorites,
+    add_favorite as persist_add_favorite,
+    remove_favorite as persist_remove_favorite,
+    clear_favorites as persist_clear_favorites
+)
+
 
 # ======================================================
 # CONFIG GLOBAL
@@ -102,7 +109,9 @@ def show_dashboard():
 
     # ====== SESSION STATE LIMPIO ======
     if "favorites" not in st.session_state:
-        st.session_state.favorites = []
+        user = st.session_state.get("username")
+        fav_struct = load_favorites(user)
+        st.session_state.favorites = fav_struct["all"]
 
     if "confirm_delete_one" not in st.session_state:
         st.session_state.confirm_delete_one = None
@@ -150,9 +159,12 @@ def show_dashboard():
                 c_yes, c_no = st.columns(2)
 
                 if c_yes.button("✅ Sí, eliminar"):
-                    st.session_state.favorites.remove(
-                        st.session_state.confirm_delete_one
-                    )
+                    user = st.session_state.get("username")
+                    ticker = st.session_state.confirm_delete_one
+
+                    persist_remove_favorite(user, ticker)
+                    st.session_state.favorites.remove(ticker)
+
                     st.session_state.confirm_delete_one = None
                     st.rerun()
 
@@ -167,6 +179,8 @@ def show_dashboard():
                 c_yes, c_no = st.columns(2)
 
                 if c_yes.button("🔥 Sí, eliminar todo"):
+                    user = st.session_state.get("username")
+                    persist_clear_favorites(user)
                     st.session_state.favorites = []
                     st.session_state.confirm_delete_all = False
                     st.rerun()
@@ -213,7 +227,10 @@ def show_dashboard():
     # ================= FAVORITOS =================
     def add_favorite():
         if ticker and ticker not in st.session_state.favorites:
+            user = st.session_state.get("username")
+            persist_add_favorite(user, ticker)
             st.session_state.favorites.append(ticker)
+            st.rerun()
 
     st.button(
         "⭐ Agregar a favoritos",
