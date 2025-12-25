@@ -131,6 +131,7 @@ def show_dashboard():
                     if st.button("❌", key=f"ask_del_{f}"):
                         st.session_state.confirm_delete_one = f
                         st.session_state.confirm_delete_all = False
+                        st.rerun()
 
             st.divider()
 
@@ -138,6 +139,7 @@ def show_dashboard():
             if st.button("🧹 Eliminar todos"):
                 st.session_state.confirm_delete_all = True
                 st.session_state.confirm_delete_one = None
+                st.rerun()
 
             # ---- CONFIRMAR ELIMINAR UNO ----
             if st.session_state.confirm_delete_one:
@@ -152,9 +154,11 @@ def show_dashboard():
                         st.session_state.confirm_delete_one
                     )
                     st.session_state.confirm_delete_one = None
+                    st.rerun()
 
                 if c_no.button("↩ Cancelar"):
                     st.session_state.confirm_delete_one = None
+                    st.rerun()
 
             # ---- CONFIRMAR ELIMINAR TODOS ----
             if st.session_state.confirm_delete_all:
@@ -165,9 +169,11 @@ def show_dashboard():
                 if c_yes.button("🔥 Sí, eliminar todo"):
                     st.session_state.favorites = []
                     st.session_state.confirm_delete_all = False
+                    st.rerun()
 
                 if c_no.button("↩ Cancelar"):
                     st.session_state.confirm_delete_all = False
+                    st.rerun()
 
             st.divider()
 
