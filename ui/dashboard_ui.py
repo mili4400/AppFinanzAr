@@ -40,7 +40,7 @@ COMPANY_TO_TICKER = {
     "Apple": "AAPL.US",
     "Google": "GOOGL.US",
     "Amazon": "AMZN.US",
-    "Galicia": "GGAL.BA"
+    "Galicia": "GGAL.BA",
     "BTC.CRYPTO",
     "ETH.CRYPTO"
 }
