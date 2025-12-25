@@ -35,6 +35,14 @@ st.markdown(
 # ======================================================
 DEMO_TICKERS = ["MSFT.US", "AAPL.US", "GOOGL.US", "AMZN.US", "GGAL.BA"]
 
+COMPANY_TO_TICKER = {
+    "Microsoft": "MSFT.US",
+    "Apple": "AAPL.US",
+    "Google": "GOOGL.US",
+    "Amazon": "AMZN.US",
+    "Galicia": "GGAL.BA"
+}
+
 ETF_THEMES = [
     "Technology", "Energy", "Healthcare", "Lithium",
     "Artificial Intelligence", "Fintech", "Space / NASA"
@@ -107,17 +115,18 @@ def demo_overview(ticker):
 def show_dashboard():
     st.title("📊 AppFinanzAr — Demo Profesional")
 
-    # ====== SESSION STATE LIMPIO ======
-    if "favorites" not in st.session_state:
-        user = st.session_state.get("username")
-        fav_struct = load_favorites(user)
+    # ====== SESSION STATE CONTROL POR USUARIO ======
+    current_user = st.session_state.get("username")
+
+    if "active_user" not in st.session_state:
+        st.session_state.active_user = None
+
+    if st.session_state.active_user != current_user:
+        fav_struct = load_favorites(current_user)
         st.session_state.favorites = fav_struct["all"]
-
-    if "confirm_delete_one" not in st.session_state:
         st.session_state.confirm_delete_one = None
-
-    if "confirm_delete_all" not in st.session_state:
         st.session_state.confirm_delete_all = False
+        st.session_state.active_user = current_user
 
     # ================= SIDEBAR DERECHA =================
     with st.sidebar:
@@ -140,7 +149,7 @@ def show_dashboard():
                     if st.button("❌", key=f"ask_del_{f}"):
                         st.session_state.confirm_delete_one = f
                         st.session_state.confirm_delete_all = False
-                        st.rerun()
+        
 
             st.divider()
 
@@ -148,7 +157,7 @@ def show_dashboard():
             if st.button("🧹 Eliminar todos"):
                 st.session_state.confirm_delete_all = True
                 st.session_state.confirm_delete_one = None
-                st.rerun()
+        
 
             # ---- CONFIRMAR ELIMINAR UNO ----
             if st.session_state.confirm_delete_one:
@@ -166,11 +175,11 @@ def show_dashboard():
                     st.session_state.favorites.remove(ticker)
 
                     st.session_state.confirm_delete_one = None
-                    st.rerun()
+        
 
                 if c_no.button("↩ Cancelar"):
                     st.session_state.confirm_delete_one = None
-                    st.rerun()
+        
 
             # ---- CONFIRMAR ELIMINAR TODOS ----
             if st.session_state.confirm_delete_all:
@@ -183,11 +192,11 @@ def show_dashboard():
                     persist_clear_favorites(user)
                     st.session_state.favorites = []
                     st.session_state.confirm_delete_all = False
-                    st.rerun()
+            
 
                 if c_no.button("↩ Cancelar"):
                     st.session_state.confirm_delete_all = False
-                    st.rerun()
+        
 
             st.divider()
 
@@ -207,17 +216,34 @@ def show_dashboard():
             st.caption("Sin favoritos aún")
         
         st.markdown("---")
-        st.subheader("🏢 Buscar por empresa (demo)")
-        st.caption("Ej: Microsoft, Apple, Google")
-        st.write(DEMO_TICKERS)
+        st.subheader("🏢 Buscar empresa")
+
+        company_name = st.text_input(
+            "Nombre de la empresa",
+            placeholder="Ej: Microsoft, Apple, Google"
+        )
+
+        if company_name:
+            ticker_found = COMPANY_TO_TICKER.get(company_name.strip())
+
+            if ticker_found:
+                st.success(f"Ticker encontrado: {ticker_found}")
+                st.session_state.selected_ticker = ticker_found
+            else:
+                st.warning("Empresa no encontrada (demo)")
+                
 
     # ================= SELECCIÓN CENTRAL =================
     st.subheader("Selección de activo")
 
+    if "selected_ticker" not in st.session_state:
+    st.session_state.selected_ticker = ""
+
     ticker = st.selectbox(
         "Elegí un ticker para comenzar",
         [""] + DEMO_TICKERS,
-        index=0
+        index=DEMO_TICKERS.index(st.session_state.selected_ticker)
+        if st.session_state.selected_ticker in DEMO_TICKERS else 0
     )
 
     if ticker == "":
