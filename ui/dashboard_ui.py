@@ -41,6 +41,8 @@ COMPANY_TO_TICKER = {
     "Google": "GOOGL.US",
     "Amazon": "AMZN.US",
     "Galicia": "GGAL.BA"
+    "BTC.CRYPTO",
+    "ETH.CRYPTO"
 }
 
 ETF_THEMES = [
@@ -56,13 +58,26 @@ PRICE_ALERTS = {
 # ======================================================
 # HELPERS DEMO
 # ======================================================
-def market_status():
+def market_status_by_asset(ticker: str):
     now = datetime.now().time()
-    if time(9,30) <= now <= time(16,0):
-        return "🟢 Mercado abierto"
-    if now < time(9,30):
-        return "🟡 Abre en menos de 1h"
-    return "🔴 Mercado cerrado"
+    asset = asset_type(ticker)
+
+    if asset == "crypto":
+        return "🟢 Cripto 24/7 — mercado abierto"
+
+    if asset == "argentina":
+        if time(11, 0) <= now <= time(17, 0):
+            return "🟢 BYMA abierto (AR)"
+        return "🔴 BYMA cerrado (AR)"
+
+    if asset == "us":
+        if time(9, 30) <= now <= time(16, 0):
+            return "🟢 Wall Street abierto (US)"
+        if now < time(9, 30):
+            return "🟡 Pre-market (US)"
+        return "🔴 Wall Street cerrado (US)"
+
+    return "⚪ Estado desconocido"
 
 def demo_ohlc(days=180):
     dates = pd.date_range(end=datetime.today(), periods=days)
@@ -109,6 +124,17 @@ def demo_overview(ticker):
         ]
     }
 
+def asset_type(ticker: str):
+    if not ticker:
+        return "unknown"
+    if ticker.endswith(".CRYPTO"):
+        return "crypto"
+    if ticker.endswith(".BA"):
+        return "argentina"
+    if ticker.endswith(".US"):
+        return "us"
+    return "unknown"
+
 # ======================================================
 # DASHBOARD
 # ======================================================
@@ -148,7 +174,8 @@ def show_dashboard():
     # ================= SIDEBAR DERECHA =================
     with st.sidebar:
         st.subheader("🕒 Estado del mercado")
-        st.write(market_status())
+        ticker = st.session_state.get("selected_ticker", "")
+        st.write(market_status_by_asset(ticker))
 
         st.markdown("---")
         st.subheader("⭐ Favoritos")
@@ -280,6 +307,53 @@ def show_dashboard():
         st.info("👆 Seleccioná un activo para ver el dashboard")
         return
 
+    # ================= ALERTAS =================
+    st.subheader("🚨 Alertas")
+
+    ticker = st.session_state.get("selected_ticker", "")
+
+    if ticker and ticker in PRICE_ALERTS:
+        msg, color = PRICE_ALERTS[ticker]
+        status = asset_type(ticker)  # "crypto" | "stock" | etc
+
+        if status == "crypto":
+            st.markdown(
+                f"""
+                <div style="
+                    padding:10px;
+                    border-radius:8px;
+                    background-color:{color};
+                    color:#0e1117;
+                    font-weight:bold;
+                ">
+                🟢 {msg} — alerta activa 24/7
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        else:
+            market_status = market_status_by_asset(ticker)
+
+            if "abierto" in market_status.lower():
+                st.markdown(
+                    f"""
+                    <div style="
+                        padding:10px;
+                        border-radius:8px;
+                        background-color:{color};
+                        color:#0e1117;
+                        font-weight:bold;
+                    ">
+                    ⚠️ {msg} — mercado abierto
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.info("⏸️ Alerta pausada — mercado cerrado")
+
+    
     # ================= FAVORITOS =================
     def add_favorite():
         if ticker and ticker not in st.session_state.favorites:
