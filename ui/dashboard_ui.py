@@ -115,6 +115,23 @@ def demo_overview(ticker):
 def show_dashboard():
     st.title("📊 AppFinanzAr — Demo Profesional")
 
+    # ====== GARANTÍAS ABSOLUTAS ======
+    if "favorites" not in st.session_state:
+        st.session_state.favorites = []
+
+    if "active_user" not in st.session_state:
+        st.session_state.active_user = None
+
+    if "confirm_delete_one" not in st.session_state:
+        st.session_state.confirm_delete_one = None
+
+    if "confirm_delete_all" not in st.session_state:
+        st.session_state.confirm_delete_all = False
+
+    if "selected_ticker" not in st.session_state:
+        st.session_state.selected_ticker = ""
+
+
     # ====== SESSION STATE CONTROL POR USUARIO ======
     current_user = st.session_state.get("username")
 
