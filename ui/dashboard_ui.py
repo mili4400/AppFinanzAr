@@ -296,11 +296,16 @@ def show_dashboard():
     if "selected_ticker" not in st.session_state:
         st.session_state.selected_ticker = ""
 
+    stocks = [t for t in DEMO_TICKERS if not t.endswith(".CRYPTO")]
+    cryptos = [t for t in DEMO_TICKERS if t.endswith(".CRYPTO")]
+
+    SELECTABLE_TICKERS = [""] + stocks + ["--- CRYPTO ---"] + cryptos
+
     ticker = st.selectbox(
         "Elegí un ticker para comenzar",
-        [""] + DEMO_TICKERS,
-        index=DEMO_TICKERS.index(st.session_state.selected_ticker)
-        if st.session_state.selected_ticker in DEMO_TICKERS else 0
+        SELECTABLE_TICKERS,
+        index=SELECTABLE_TICKERS.index(st.session_state.selected_ticker)
+        if st.session_state.get("selected_ticker") in SELECTABLE_TICKERS else 0
     )
 
     if ticker == "":
