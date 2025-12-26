@@ -308,7 +308,7 @@ def show_dashboard():
         if st.session_state.get("selected_ticker") in SELECTABLE_TICKERS else 0
     )
 
-    if ticker == "":
+    if ticker in ("", "--- CRYPTO ---"):
         st.info("👆 Seleccioná un activo para ver el dashboard")
         return
 
