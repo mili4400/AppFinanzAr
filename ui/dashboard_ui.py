@@ -33,16 +33,20 @@ st.markdown(
 # ======================================================
 # CONSTANTES DEMO
 # ======================================================
-DEMO_TICKERS = ["MSFT.US", "AAPL.US", "GOOGL.US", "AMZN.US", "GGAL.BA"]
+DEMO_TICKERS = ["MSFT.US", "AAPL.US", "GOOGL.US", "AMZN.US", "GGAL.BA", "BTC.CRYPTO",
+    "ETH.CRYPTO"]
 
-COMPANY_TO_TICKER = {
+STOCK_TICKERS = {
     "Microsoft": "MSFT.US",
     "Apple": "AAPL.US",
     "Google": "GOOGL.US",
     "Amazon": "AMZN.US",
-    "Galicia": "GGAL.BA",
+    "Galicia": "GGAL.BA"
+}
+
+CRYPTO_TICKERS = {
     "Bitcoin": "BTC.CRYPTO",
-    "Ethereum": "ETH.CRYPTO",
+    "Ethereum": "ETH.CRYPTO"
 }
 
 ETF_THEMES = [
@@ -299,18 +303,31 @@ def show_dashboard():
     stocks = [t for t in DEMO_TICKERS if not t.endswith(".CRYPTO")]
     cryptos = [t for t in DEMO_TICKERS if t.endswith(".CRYPTO")]
 
-    SELECTABLE_TICKERS = [""] + stocks + ["--- CRYPTO ---"] + cryptos
+    SELECTABLE_TICKERS = (
+        [""] +
+        [f"📈 {t}" for t in STOCK_TICKERS] +
+        ["— CRIPTOMONEDAS —"] +
+        [f"🟣 {t}" for t in CRYPTO_TICKERS]
+    )
 
-    ticker = st.selectbox(
+    ticker_label = st.selectbox(
         "Elegí un ticker para comenzar",
         SELECTABLE_TICKERS,
         index=SELECTABLE_TICKERS.index(st.session_state.selected_ticker)
         if st.session_state.get("selected_ticker") in SELECTABLE_TICKERS else 0
     )
 
-    if ticker in ("", "--- CRYPTO ---"):
+    if ticker_label in ("", "--- CRIPTOMONEDAS ---"):
         st.info("👆 Seleccioná un activo para ver el dashboard")
         return
+
+    ticker = (
+        ticker_label
+        .replace("📈 ", "")
+        .replace("🟣 ", "")
+    )
+
+st.session_state.selected_ticker = ticker
 
     # ================= ALERTAS =================
     st.subheader("🚨 Alertas")
