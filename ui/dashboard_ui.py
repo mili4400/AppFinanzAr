@@ -69,12 +69,12 @@ def market_status_by_asset(ticker: str):
     if asset == "crypto":
         return "🟢 Cripto 24/7 — mercado abierto"
 
-    if asset == "argentina":
+    if asset == "stock argentina":
         if time(11, 0) <= now <= time(17, 0):
             return "🟢 BYMA abierto (AR)"
         return "🔴 BYMA cerrado (AR)"
 
-    if asset == "us":
+    if asset == "stock us":
         if time(9, 30) <= now <= time(16, 0):
             return "🟢 Wall Street abierto (US)"
         if now < time(9, 30):
@@ -134,9 +134,9 @@ def asset_type(ticker: str):
     if ticker.endswith(".CRYPTO"):
         return "crypto"
     if ticker.endswith(".BA"):
-        return "argentina"
+        return "stock argentina"
     if ticker.endswith(".US"):
-        return "us"
+        return "stock us"
     return "unknown"
 
 # ======================================================
@@ -179,7 +179,7 @@ def show_dashboard():
     with st.sidebar:
         st.subheader("🕒 Estado del mercado")
         ticker = st.session_state.get("selected_ticker", "")
-        st.write(market_status_by_asset(ticker))
+            st.write(market_status_by_asset(ticker))
 
         st.markdown("---")
         st.subheader("⭐ Favoritos")
