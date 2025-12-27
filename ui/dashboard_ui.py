@@ -179,25 +179,46 @@ def show_dashboard():
     with st.sidebar:
         st.subheader("🕒 Estado del mercado")
         ticker = st.session_state.get("selected_ticker", "")
-            st.write(market_status_by_asset(ticker))
+        st.write(market_status_by_asset(ticker))
 
         st.markdown("---")
         st.subheader("⭐ Favoritos")
 
         if st.session_state.favorites:
 
-            # ---- LISTA ----
+            # ---- AGRUPAR FAVORITOS POR TIPO ----
+            stocks = []
+            cryptos = []
+
             for f in st.session_state.favorites:
-                c1, c2 = st.columns([6,1])
+                if asset_type(f) == "crypto":
+                    cryptos.append(f)
+                else:
+                    stocks.append(f)
 
-                with c1:
-                    st.write(f"• {f}")
+            # ---- ACCIONES ----
+            if stocks:
+                st.markdown("📈 **Acciones**")
+                for f in stocks:
+                    c1, c2 = st.columns([6,1])
+                    with c1:
+                        st.write(f"• {f}")
+                    with c2:
+                        if st.button("❌", key=f"del_{f}"):
+                            st.session_state.confirm_delete_one = f
+                            st.session_state.confirm_delete_all = False
 
-                with c2:
-                    if st.button("❌", key=f"ask_del_{f}"):
-                        st.session_state.confirm_delete_one = f
-                        st.session_state.confirm_delete_all = False
-        
+            # ---- CRIPTO ----
+            if cryptos:
+                st.markdown("🟣 **Cripto**")
+                for f in cryptos:
+                    c1, c2 = st.columns([6,1])
+                    with c1:
+                        st.write(f"• {f}")
+                    with c2:
+                        if st.button("❌", key=f"del_{f}"):
+                            st.session_state.confirm_delete_one = f
+                            st.session_state.confirm_delete_all = False
 
             st.divider()
 
@@ -305,9 +326,9 @@ def show_dashboard():
 
     SELECTABLE_TICKERS = (
         [""] +
-        [f"📈 {t}" for t in STOCK_TICKERS] +
+        [f"📈 {v}" for v in STOCK_TICKERS.values()] +
         ["— CRIPTOMONEDAS —"] +
-        [f"🟣 {t}" for t in CRYPTO_TICKERS]
+        [f"🟣 {v}" for v in CRYPTO_TICKERS.values()]
     )
 
     ticker_label = st.selectbox(
@@ -327,7 +348,7 @@ def show_dashboard():
         .replace("🟣 ", "")
     )
 
-st.session_state.selected_ticker = ticker
+    st.session_state.selected_ticker = ticker
 
     # ================= ALERTAS =================
     st.subheader("🚨 Alertas")
