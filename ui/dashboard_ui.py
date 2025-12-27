@@ -59,6 +59,43 @@ PRICE_ALERTS = {
     "GGAL.BA": ("Precio muy bajo", "#ff4d4d")
 }
 
+SMART_ALERTS = {
+    "BTC.CRYPTO": {
+        "volatility": 18.4,
+        "pump": True,
+        "dormant": False,
+        "rapid_move": True
+    },
+    "ETH.CRYPTO": {
+        "volatility": 6.1,
+        "pump": False,
+        "dormant": False
+    },
+    "MSFT.US": {
+        "price": "high"
+    }
+}
+
+ASSET_FLAGS = {
+    "BTC.CRYPTO": [],
+    "ETH.CRYPTO": [],
+    "DOGE.CRYPTO": ["suspicious"],
+}
+
+AUTOCOMPLETE_ASSETS = {
+    # Acciones
+    "Microsoft": "MSFT.US",
+    "Apple": "AAPL.US",
+    "Google": "GOOGL.US",
+    "Amazon": "AMZN.US",
+    "Galicia": "GGAL.BA",
+
+    # Criptos
+    "Bitcoin": "BTC.CRYPTO",
+    "Ethereum": "ETH.CRYPTO"
+}
+
+
 # ======================================================
 # HELPERS DEMO
 # ======================================================
@@ -67,7 +104,7 @@ def market_status_by_asset(ticker: str):
     asset = asset_type(ticker)
 
     if asset == "crypto":
-        return "🟢 Cripto 24/7 — mercado abierto"
+        return "🟣 Cripto 24/7 — mercado abierto"
 
     if asset == "stock argentina":
         if time(11, 0) <= now <= time(17, 0):
@@ -138,6 +175,38 @@ def asset_type(ticker: str):
     if ticker.endswith(".US"):
         return "stock us"
     return "unknown"
+
+def risk_score(ticker):
+    score = 0
+    alerts = SMART_ALERTS.get(ticker, {})
+
+    if ticker.endswith(".CRYPTO"):
+        score += 35
+
+    if alerts.get("pump"):
+        score += 25
+
+    if alerts.get("volatility", 0) > 12:
+        score += 20
+
+    if alerts.get("rapid_move"):
+        score += 10
+
+    if "suspicious" in ASSET_FLAGS.get(ticker, []):
+        score += 20
+
+    return min(score, 100)
+
+def recommend_for_user(favorites):
+    if not favorites:
+        return None
+
+    safe_assets = [
+        f for f in favorites
+        if risk_score(f) < 60
+    ]
+
+    return safe_assets[0] if safe_assets else favorites[0]
 
 # ======================================================
 # DASHBOARD
@@ -285,35 +354,53 @@ def show_dashboard():
             st.caption("Sin favoritos aún")
         
         st.markdown("---")
-        st.subheader("🏢 Buscar empresa")
+        st.subheader("📈 Acciones")
 
-        company_name = st.text_input(
-            "Nombre de la empresa",
-            placeholder="Ej: Microsoft, Apple, Google"
+        company_query = st.text_input(
+            "🏢 Buscar empresa",
+            placeholder="Ej: Microsoft, Apple"
         )
 
-        if company_name:
-            matches = [
-                name for name in COMPANY_TO_TICKER.keys()
-                if company_name.lower() in name.lower()
-            ]
+        matches = [
+            name for name in STOCK_TICKERS
+            if company_query.lower() in name.lower()
+        ]
 
-            if len(matches) == 1:
-                ticker_found = COMPANY_TO_TICKER[matches[0]]
-                st.success(f"Ticker encontrado: {ticker_found}")
-                st.session_state.selected_ticker = ticker_found
+        company = st.selectbox("Resultados", [""] + matches)
 
-            elif len(matches) > 1:
-                st.info("Coincidencias encontradas:")
-                company_selected = st.selectbox("Seleccioná una", matches)
+        if len(matches) == 1:
+            ticker_found = STOCK_TICKERS[matches[0]]
+            st.success(f"Ticker encontrado: {ticker_found}")
+            st.session_state.selected_ticker = ticker_found
 
-                ticker_found = COMPANY_TO_TICKER[company_selected]
-                st.session_state.selected_ticker = ticker_found
+        elif len(matches) > 1:    
+            st.info("Coincidencias encontradas:")    
+            company_selected = st.selectbox("Seleccioná una", matches)
 
-            else:
-                st.warning("Empresa no encontrada (solo tickers demo disponibles)")
+            ticker_found = STOCK_TICKERS[company_selected]
+            st.session_state.selected_ticker = ticker_found
 
-                
+        else:
+            st.warning("Empresa no encontrada (solo tickers demo disponibles)")
+
+        st.subheader("🟣 Criptomonedas")
+
+        crypto_query = st.text_input(
+            "Buscar cripto (nombre o símbolo)",
+            placeholder="Ej: bitcoin, btc, eth"
+        )
+
+        matches = [
+            name for name, t in CRYPTO_TICKERS.items()
+            if crypto_query.lower() in name.lower()
+            or crypto_query.lower() in t.lower()
+        ]
+
+        crypto = st.selectbox("Resultados", [""] + matches)
+
+        if crypto:
+            st.session_state.selected_ticker = CRYPTO_TICKERS[crypto]
+      
 
     # ================= SELECCIÓN CENTRAL =================
     st.subheader("Selección de activo")
@@ -355,6 +442,7 @@ def show_dashboard():
 
     ticker = st.session_state.get("selected_ticker", "")
 
+   # ----- ALERTAS CLÁSICAS ----- 
     if ticker and ticker in PRICE_ALERTS:
         msg, color = PRICE_ALERTS[ticker]
         status = asset_type(ticker)  # "crypto" | "stock" | etc
@@ -396,6 +484,47 @@ def show_dashboard():
             else:
                 st.info("⏸️ Alerta pausada — mercado cerrado")
 
+    # ----- ALERTAS INTELIGENTES (NUEVAS) -----
+    alerts = SMART_ALERTS.get(ticker, {})
+
+    if alerts:
+        st.markdown("**🧠 Alertas inteligentes**")
+
+        if alerts.get("pump"):
+            st.error("🔥 Pump inusual detectado")
+
+        if alerts.get("rapid_move"):
+            st.warning("⏱️ Movimiento brusco en corto plazo")
+
+        if alerts.get("dormant"):
+            st.info("🧊 Activo dormido — bajo volumen")
+
+        if alerts.get("volatility", 0) > 10:
+            st.warning(f"🌪️ Volatilidad elevada: {alerts['volatility']}%")
+
+    # ================= SCORE DE RIESGO =================
+    def risk_score(asset):
+        score = 0
+
+        if asset.endswith(".CRYPTO"):
+            score += 40  # riesgo base cripto
+        if ALERTS.get(asset, {}).get("pump"):
+            score += 30
+        if ALERTS.get(asset, {}).get("volatility", 0) > 15:
+            score += 20
+
+        return min(score, 100)    
+
+    if ticker:
+        risk = risk_score(ticker)
+
+        st.metric(
+            "⚠️ Score de riesgo",
+            f"{risk}/100",
+            help="Cuanto mayor, más riesgoso el activo"
+        )
+    if "suspicious" in ASSET_FLAGS.get(ticker, []):
+        st.error("🚫 Activo marcado como sospechoso (riesgo elevado)")
     
     # ================= FAVORITOS =================
     def add_favorite():
@@ -442,6 +571,16 @@ def show_dashboard():
     st.subheader("🏭 Competidores")
     st.write(", ".join(ov["competitors"]))
 
+    st.subheader("🧠 Recomendado para vos")
+
+    rec = recommend_for_user(st.session_state.favorites)
+
+    if rec:
+        st.success(f"Podría interesarte: {rec}")
+    else:
+        st.caption("Agregá favoritos para recibir recomendaciones")
+
+
     # ================= NOTICIAS =================
     st.subheader("📰 Noticias & Sentimiento")
     for n in ov["news"]:
@@ -470,16 +609,24 @@ def show_dashboard():
         })
 
     # ================= RANKING =================
-    st.subheader("🏆 Ranking de oportunidades")
+    st.subheader("🏆 Ranking personalizado")
+
     ranking = []
-    for t in DEMO_TICKERS:
+
+    for f in st.session_state.favorites:
         ranking.append({
-            "Ticker": t,
+            "Ticker": f,
+            "Riesgo": risk_score(f),
             "Score": global_score(
-                np.random.uniform(-5,5),
-                np.random.uniform(-1,1)
+                np.random.uniform(-3, 6),
+                np.random.uniform(-1, 1)
             )
         })
-    st.table(pd.DataFrame(ranking).sort_values("Score", ascending=False))
+
+    if ranking:
+        df = pd.DataFrame(ranking)
+        st.table(df.sort_values("Score", ascending=False))
+    else:
+        st.info("Agregá favoritos para generar tu ranking")
 
     st.caption("Modo DEMO 100% — datos simulados con fines demostrativos")
