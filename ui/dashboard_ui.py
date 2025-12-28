@@ -1,30 +1,16 @@
-# ======================================================
-# AppFinanzAr — Dashboard FINAL (Auth Safe / Demo → Real)
-# ======================================================
-
+# ui/dashboard_ui.py
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime, timedelta, time
 
-# ======================================================
-# 🔐 AUTH GUARD — NO LOGIN, NO DASHBOARD
-# ======================================================
-if "username" not in st.session_state:
-    st.error("Sesión inválida. Ingresá desde el login.")
-    st.stop()
-
-# ======================================================
-# CONFIG
-# ======================================================
-st.set_page_config(
-    page_title="AppFinanzAr",
-    layout="wide",
-    initial_sidebar_state="expanded"
+from core.favorites import (
+    load_favorites,
+    add_favorite as persist_add_favorite,
+    remove_favorite as persist_remove_favorite,
+    clear_favorites as persist_clear_favorites
 )
-
-DATA_MODE = "demo"  # demo | real (EODHD futuro)
 
 # ======================================================
 # DEMO DATA
@@ -43,26 +29,24 @@ CRYPTO_TICKERS = {
     "Solana": "SOL.CRYPTO"
 }
 
-ALL_ASSETS = {**STOCK_TICKERS, **CRYPTO_TICKERS}
-
 ETF_THEMES = [
     "Technology", "Energy", "Healthcare",
     "Artificial Intelligence", "Fintech", "Space"
 ]
 
 PRICE_ALERTS = {
-    "MSFT.US": "Precio excesivamente alto",
-    "GGAL.BA": "Precio muy bajo"
+    "MSFT.US": ("Precio excesivamente alto", "#00ff99"),
+    "GGAL.BA": ("Precio muy bajo", "#ff4d4d")
 }
 
 SMART_ALERTS = {
-    "BTC.CRYPTO": {"pump": True, "volatility": 18},
-    "ETH.CRYPTO": {"volatility": 9}
+    "BTC.CRYPTO": {"pump": True, "volatility": 18, "rapid_move": True},
+    "ETH.CRYPTO": {"volatility": 9},
 }
 
 ASSET_FLAGS = {
     "BTC.CRYPTO": ["Alta volatilidad", "Demo data"],
-    "GGAL.BA": ["Mercado local", "Demo data"]
+    "GGAL.BA": ["Mercado local", "Demo data"],
 }
 
 # ======================================================
@@ -70,7 +54,7 @@ ASSET_FLAGS = {
 # ======================================================
 def asset_type(t):
     if t.endswith(".CRYPTO"):
-        return "Criptomoneda"
+        return "Cripto"
     if t.endswith(".BA"):
         return "Acción Argentina"
     return "Acción USA"
@@ -85,12 +69,12 @@ def market_status(t):
 
 def demo_ohlc(start, end):
     days = max((end - start).days, 30)
-    dates = pd.date_range(end=end, periods=days)
+    dates = pd.date_range(start=start, periods=days)
     price = 100 + np.cumsum(np.random.randn(days))
     df = pd.DataFrame({
         "date": dates,
         "open": price + np.random.randn(days),
-        "close": price
+        "close": price,
     })
     df["high"] = df[["open","close"]].max(axis=1) + abs(np.random.randn(days))
     df["low"] = df[["open","close"]].min(axis=1) - abs(np.random.randn(days))
@@ -100,13 +84,20 @@ def demo_ohlc(start, end):
 
 def risk_score(t):
     score = 20 if t.endswith(".CRYPTO") else 10
-    a = SMART_ALERTS.get(t, {})
-    if a.get("pump"): score += 30
-    if a.get("volatility",0) > 15: score += 20
-    return min(score,100)
+    alerts = SMART_ALERTS.get(t, {})
+    if alerts.get("pump"):
+        score += 30
+    if alerts.get("volatility",0) > 15:
+        score += 20
+    return min(score, 100)
 
 def demo_overview(t):
     return {
+        "executive": {
+            "Ticker": t,
+            "Sector": "Technology",
+            "Score Global": round(np.random.uniform(40,90),2)
+        },
         "fundamentals": {
             "Revenue": "1200M",
             "Profit": "260M",
@@ -115,189 +106,192 @@ def demo_overview(t):
         },
         "competitors": ["AAPL", "GOOGL", "AMZN"],
         "news": [
-            {"title": "Strong growth outlook", "sentiment": 0.6},
-            {"title": "Short term volatility expected", "sentiment": -0.3}
+            {"title": "Strong growth outlook", "sentiment": 0.7},
+            {"title": "Analysts cautious short term", "sentiment": -0.3}
         ]
     }
 
 def recommend_for_user(favs):
+    if not favs:
+        return None
     safe = [f for f in favs if risk_score(f) < 60]
-    return safe[0] if safe else (favs[0] if favs else None)
+    return safe[0] if safe else favs[0]
 
 # ======================================================
-# SESSION
+# DASHBOARD
 # ======================================================
-st.session_state.setdefault("favorites", [])
-st.session_state.setdefault("selected_ticker", "")
+def show_dashboard():
+    st.title("📊 AppFinanzAr — Dashboard")
 
-# ======================================================
-# SIDEBAR — SEARCH / FAVORITES
-# ======================================================
-with st.sidebar:
-    st.subheader("🔍 Buscar activo")
-    q = st.text_input("Empresa o ticker (min 2 letras)")
+    user = st.session_state.get("username")
 
-    matches = []
-    if len(q) >= 2:
-        for n,t in ALL_ASSETS.items():
-            if q.lower() in n.lower() or q.lower() in t.lower():
-                matches.append(f"{n} ({t})")
+    # -------- session --------
+    if "favorites" not in st.session_state:
+        st.session_state.favorites = load_favorites(user)["all"]
 
-    if matches:
-        sel = st.radio("Resultados", matches)
-        if sel:
-            st.session_state.selected_ticker = sel.split("(")[1][:-1]
-            st.rerun()
+    if "selected_ticker" not in st.session_state:
+        st.session_state.selected_ticker = ""
 
-    st.markdown("---")
-    st.subheader("⭐ Favoritos")
+    # ==================================================
+    # SIDEBAR
+    # ==================================================
+    with st.sidebar:
+        st.subheader("🔍 Acciones")
 
-    stocks = [f for f in st.session_state.favorites if not f.endswith(".CRYPTO")]
-    cryptos = [f for f in st.session_state.favorites if f.endswith(".CRYPTO")]
+        q_stock = st.text_input("Buscar empresa o ticker")
+        stock_matches = [
+            f"{n} ({t})"
+            for n,t in STOCK_TICKERS.items()
+            if q_stock.lower() in n.lower() or q_stock.lower() in t.lower()
+        ]
 
-    st.caption("Acciones")
-    for f in stocks: st.write("•", f)
+        sel_stock = st.selectbox("Resultados acciones", [""] + stock_matches)
+        if sel_stock:
+            st.session_state.selected_ticker = sel_stock.split("(")[1].replace(")","")
 
-    st.caption("Criptomonedas")
-    for f in cryptos: st.write("•", f)
+        st.divider()
+        st.subheader("🟣 Criptomonedas")
 
-    if st.session_state.favorites:
-        csv = pd.DataFrame({"Ticker": st.session_state.favorites}).to_csv(index=False)
-        st.download_button("⬇ Exportar CSV", csv, "favoritos.csv")
+        q_crypto = st.text_input("Buscar cripto o ticker")
+        crypto_matches = [
+            f"{n} ({t})"
+            for n,t in CRYPTO_TICKERS.items()
+            if q_crypto.lower() in n.lower() or q_crypto.lower() in t.lower()
+        ]
 
-# ======================================================
-# MAIN
-# ======================================================
-st.title("📊 AppFinanzAr")
+        sel_crypto = st.selectbox("Resultados cripto", [""] + crypto_matches)
+        if sel_crypto:
+            st.session_state.selected_ticker = sel_crypto.split("(")[1].replace(")","")
 
-# HOME
-if not st.session_state.selected_ticker:
-    st.subheader("Acciones demo")
-    for n,t in STOCK_TICKERS.items():
-        if st.button(f"{n} ({t})"):
-            st.session_state.selected_ticker = t
-            st.rerun()
+        st.divider()
+        st.subheader("⭐ Favoritos")
 
-    st.subheader("Criptomonedas demo")
-    for n,t in CRYPTO_TICKERS.items():
-        if st.button(f"{n} ({t})"):
-            st.session_state.selected_ticker = t
-            st.rerun()
+        stocks = [f for f in st.session_state.favorites if not f.endswith(".CRYPTO")]
+        cryptos = [f for f in st.session_state.favorites if f.endswith(".CRYPTO")]
 
-    st.info("Seleccioná un activo para comenzar")
-    st.stop()
+        st.caption("Acciones")
+        for f in stocks:
+            st.write("•", f)
 
-ticker = st.session_state.selected_ticker
+        st.caption("Cripto")
+        for f in cryptos:
+            st.write("•", f)
 
-# ======================================================
-# HEADER
-# ======================================================
-st.subheader(f"{ticker} — {asset_type(ticker)}")
-st.caption(market_status(ticker))
+        if st.session_state.favorites:
+            csv = pd.DataFrame({"Ticker": st.session_state.favorites}).to_csv(index=False)
+            st.download_button("⬇ Exportar CSV", csv, "favoritos.csv")
 
-# FLAGS
-st.markdown("### 🚩 Flags")
-for f in ASSET_FLAGS.get(ticker, ["Demo data"]):
-    st.write("•", f)
+    # ==================================================
+    # MAIN
+    # ==================================================
+    if not st.session_state.selected_ticker:
+        st.info("Seleccioná una acción o cripto desde el sidebar")
+        return
 
-# ALERTAS
-if ticker in PRICE_ALERTS:
-    st.warning(PRICE_ALERTS[ticker])
+    ticker = st.session_state.selected_ticker
 
-a = SMART_ALERTS.get(ticker, {})
-if a.get("pump"): st.error("🔥 Pump detectado")
-if a.get("volatility",0)>10: st.warning(f"🌪️ Volatilidad {a['volatility']}%")
+    st.subheader(f"{ticker} — {asset_type(ticker)}")
+    st.caption(market_status(ticker))
 
-# ======================================================
-# TIMEFRAME
-# ======================================================
-c1,c2 = st.columns(2)
-with c1:
-    r = st.selectbox("Rango rápido", ["1M","3M","6M","1Y"])
-with c2:
-    d1 = st.date_input("Desde", datetime.today()-timedelta(days=180))
-    d2 = st.date_input("Hasta", datetime.today())
+    # FLAGS
+    st.markdown("### 🚩 Flags")
+    for f in ASSET_FLAGS.get(ticker, []):
+        st.write(f)
 
-days = {"1M":30,"3M":90,"6M":180,"1Y":365}[r]
-df = demo_ohlc(datetime.today()-timedelta(days=days), datetime.today())
+    # ALERTAS
+    if ticker in PRICE_ALERTS:
+        st.warning(PRICE_ALERTS[ticker][0])
 
-# ======================================================
-# GRAPH
-# ======================================================
-fig = go.Figure()
-fig.add_candlestick(x=df["date"], open=df["open"], high=df["high"],
-                    low=df["low"], close=df["close"])
-fig.add_scatter(x=df["date"], y=df["SMA20"], name="SMA20")
-fig.add_scatter(x=df["date"], y=df["EMA20"], name="EMA20")
-st.plotly_chart(fig, use_container_width=True)
+    alerts = SMART_ALERTS.get(ticker, {})
+    if alerts.get("pump"):
+        st.error("🔥 Pump detectado")
+    if alerts.get("rapid_move"):
+        st.warning("⏱️ Movimiento brusco")
+    if alerts.get("volatility",0)>10:
+        st.warning(f"🌪️ Volatilidad {alerts['volatility']}%")
 
-if st.button("⭐ Agregar a favoritos"):
-    if ticker not in st.session_state.favorites:
-        st.session_state.favorites.append(ticker)
-        st.rerun()
+    # TIMEFRAME
+    c1,c2 = st.columns(2)
+    with c1:
+        tf = st.selectbox("Rango rápido", ["1M","3M","6M","1Y"])
+    with c2:
+        start = st.date_input("Desde", datetime.today()-timedelta(days=180))
+        end = st.date_input("Hasta", datetime.today())
 
-# ======================================================
-# OVERVIEW
-# ======================================================
-ov = demo_overview(ticker)
+    days = {"1M":30,"3M":90,"6M":180,"1Y":365}[tf]
+    start = datetime.today()-timedelta(days=days)
+    df = demo_ohlc(start, end)
 
-st.subheader("📊 Fundamentales")
-st.table(pd.DataFrame.from_dict(ov["fundamentals"], orient="index", columns=["Valor"]))
+    fig = go.Figure()
+    fig.add_candlestick(
+        x=df["date"],
+        open=df["open"],
+        high=df["high"],
+        low=df["low"],
+        close=df["close"]
+    )
+    fig.add_scatter(x=df["date"], y=df["SMA20"], name="SMA20")
+    fig.add_scatter(x=df["date"], y=df["EMA20"], name="EMA20")
+    st.plotly_chart(fig, use_container_width=True)
 
-st.subheader("🏭 Competidores")
-st.write(", ".join(ov["competitors"]))
+    if st.button("⭐ Agregar a favoritos"):
+        if ticker not in st.session_state.favorites:
+            persist_add_favorite(user, ticker)
+            st.session_state.favorites.append(ticker)
 
-st.metric("⚠️ Riesgo", f"{risk_score(ticker)}/100")
+    # OVERVIEW
+    ov = demo_overview(ticker)
+    st.subheader("📋 Resumen Ejecutivo")
+    st.json(ov["executive"])
 
-# ======================================================
-# NOTICIAS
-# ======================================================
-st.subheader("📰 Noticias & Sentimiento")
-for n in ov["news"]:
-    lab = "📈 Positivo" if n["sentiment"]>0 else "📉 Negativo"
-    st.write(f"- {n['title']} — {lab}")
+    st.subheader("📊 Fundamentales")
+    st.table(pd.DataFrame.from_dict(ov["fundamentals"], orient="index", columns=["Valor"]))
 
-# ======================================================
-# ETF FINDER
-# ======================================================
-st.subheader("🧭 ETF Finder")
-tema = st.selectbox("Tema", ETF_THEMES)
-if st.button("Buscar ETFs"):
-    st.table(pd.DataFrame([
-        {"ETF":"DEMO-ETF-1","Tema":tema},
-        {"ETF":"DEMO-ETF-2","Tema":tema}
-    ]))
+    st.subheader("🏭 Competidores")
+    st.write(", ".join(ov["competitors"]))
 
-# ======================================================
-# COMPARACIÓN
-# ======================================================
-st.subheader("🔀 Comparación rápida")
-a,b = st.columns(2)
-t1 = a.selectbox("Activo A", list(ALL_ASSETS.values()))
-t2 = b.selectbox("Activo B", list(ALL_ASSETS.values()))
-if st.button("Comparar"):
-    st.bar_chart({t1:np.random.rand()*100, t2:np.random.rand()*100})
+    st.metric("⚠️ Riesgo", f"{risk_score(ticker)}/100")
 
-# ======================================================
-# RANKING
-# ======================================================
-st.subheader("🏆 Ranking personalizado")
-if st.session_state.favorites:
-    rows = [{"Ticker":f,"Score":np.random.uniform(40,90),"Riesgo":risk_score(f)}
-            for f in st.session_state.favorites]
-    st.table(pd.DataFrame(rows).sort_values("Score", ascending=False))
-else:
-    st.caption("Agregá favoritos")
+    # NOTICIAS
+    st.subheader("📰 Noticias & Sentimiento")
+    for n in ov["news"]:
+        st.write(f"- {n['title']}")
 
-# ======================================================
-# RECOMENDADO
-# ======================================================
-st.subheader("🧠 Recomendado para vos")
-rec = recommend_for_user(st.session_state.favorites)
-if rec:
-    st.success(f"Podría interesarte: {rec}")
-else:
-    st.caption("Sin datos suficientes")
+    # ETF
+    st.subheader("🧭 ETF Finder")
+    tema = st.selectbox("Tema", ETF_THEMES)
+    if st.button("Buscar ETFs"):
+        st.table(pd.DataFrame([
+            {"ETF":"DEMO-ETF-1","Tema":tema},
+            {"ETF":"DEMO-ETF-2","Tema":tema}
+        ]))
 
-st.caption("Modo DEMO — listo para EODHD + SQL")
+    # COMPARACIÓN
+    st.subheader("🔀 Comparación rápida")
+    c1,c2 = st.columns(2)
+    t1 = c1.selectbox("Ticker A", list(STOCK_TICKERS.values())+list(CRYPTO_TICKERS.values()))
+    t2 = c2.selectbox("Ticker B", list(STOCK_TICKERS.values())+list(CRYPTO_TICKERS.values()))
+
+    if st.button("Comparar"):
+        st.bar_chart({
+            t1: np.random.uniform(40,80),
+            t2: np.random.uniform(40,80)
+        })
+
+    # RANKING
+    st.subheader("🏆 Ranking personalizado")
+    rows = [{
+        "Ticker": f,
+        "Riesgo": risk_score(f),
+        "Score": np.random.uniform(40,90)
+    } for f in st.session_state.favorites]
+
+    if rows:
+        st.table(pd.DataFrame(rows).sort_values("Score", ascending=False))
+
+    # RECOMENDADO
+    st.subheader("🧠 Recomendado para vos")
+    rec = recommend_for_user(st.session_state.favorites)
+    if rec:
+        st.success(f"Podría interesarte: {rec}")
 
