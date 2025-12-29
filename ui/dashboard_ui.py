@@ -134,8 +134,10 @@ def show_dashboard():
         # ================= SIDEBAR DERECHA =================
     with st.sidebar:
         st.subheader("🕒 Estado del mercado")
-        ticker = st.session_state.get("selected_ticker", "")
-        st.write(market_status_by_asset(ticker))
+        if ticker:
+            st.write(market_status_by_asset(ticker))
+        else:
+            st.caption("Seleccioná un activo")
 
         st.markdown("---")
         st.subheader("⭐ Favoritos")
@@ -197,7 +199,8 @@ def show_dashboard():
                     ticker = st.session_state.confirm_delete_one
 
                     persist_remove_favorite(user, ticker)
-                    st.session_state.favorites.remove(ticker)
+                    if ticker in st.session_state.favorites:
+                        st.session_state.favorites.remove(ticker)
 
                     st.session_state.confirm_delete_one = None
         
@@ -308,11 +311,16 @@ def show_dashboard():
     ticker_label = st.selectbox(
         "Elegí un ticker para comenzar",
         SELECTABLE_TICKERS,
-        index=SELECTABLE_TICKERS.index(st.session_state.selected_ticker)
-        if st.session_state.get("selected_ticker") in SELECTABLE_TICKERS else 0
+        current_label = (
+            f"📈 {st.session_state.selected_ticker}"
+            if st.session_state.selected_ticker.endswith(".US") or st.session_state.selected_ticker.endswith(".BA")
+            else f"🟣 {st.session_state.selected_ticker}"
+        )
+
+        index = SELECTABLE_TICKERS.index(current_label) if current_label in SELECTABLE_TICKERS else 0
     )
 
-    if ticker_label in ("", "--- CRIPTOMONEDAS ---"):
+    if ticker_label in ("", "— CRIPTOMONEDAS —"):
         st.info("👆 Seleccioná un activo para ver el dashboard")
         return
 
