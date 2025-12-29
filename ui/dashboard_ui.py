@@ -120,133 +120,294 @@ def recommend_for_user(favs):
 # ======================================================
 # DASHBOARD
 # ======================================================
+
 def show_dashboard():
-    st.title("📊 AppFinanzAr — Dashboard")
+    st.title("📊 AppFinanzAr")
 
-    user = st.session_state.get("username")
+    # ================= SESSION SAFE =================
+    if "selected_ticker" not in st.session_state:
+        st.session_state.selected_ticker = None
 
-    # -------- session --------
     if "favorites" not in st.session_state:
-        st.session_state.favorites = load_favorites(user)["all"]
+        st.session_state.favorites = []
+
+        # ================= SIDEBAR DERECHA =================
+    with st.sidebar:
+        st.subheader("🕒 Estado del mercado")
+        ticker = st.session_state.get("selected_ticker", "")
+        st.write(market_status_by_asset(ticker))
+
+        st.markdown("---")
+        st.subheader("⭐ Favoritos")
+
+        if st.session_state.favorites:
+
+            # ---- AGRUPAR FAVORITOS POR TIPO ----
+            stocks = []
+            cryptos = []
+
+            for f in st.session_state.favorites:
+                if asset_type(f) == "crypto":
+                    cryptos.append(f)
+                else:
+                    stocks.append(f)
+
+            # ---- ACCIONES ----
+            if stocks:
+                st.markdown("📈 **Acciones**")
+                for f in stocks:
+                    c1, c2 = st.columns([6,1])
+                    with c1:
+                        st.write(f"• {f}")
+                    with c2:
+                        if st.button("❌", key=f"del_{f}"):
+                            st.session_state.confirm_delete_one = f
+                            st.session_state.confirm_delete_all = False
+
+            # ---- CRIPTO ----
+            if cryptos:
+                st.markdown("🟣 **Cripto**")
+                for f in cryptos:
+                    c1, c2 = st.columns([6,1])
+                    with c1:
+                        st.write(f"• {f}")
+                    with c2:
+                        if st.button("❌", key=f"del_{f}"):
+                            st.session_state.confirm_delete_one = f
+                            st.session_state.confirm_delete_all = False
+
+            st.divider()
+
+            # ---- ELIMINAR TODOS ----
+            if st.button("🧹 Eliminar todos"):
+                st.session_state.confirm_delete_all = True
+                st.session_state.confirm_delete_one = None
+        
+
+            # ---- CONFIRMAR ELIMINAR UNO ----
+            if st.session_state.confirm_delete_one:
+                st.warning(
+                    f"¿Eliminar {st.session_state.confirm_delete_one} de favoritos?"
+                )
+
+                c_yes, c_no = st.columns(2)
+
+                if c_yes.button("✅ Sí, eliminar"):
+                    user = st.session_state.get("username")
+                    ticker = st.session_state.confirm_delete_one
+
+                    persist_remove_favorite(user, ticker)
+                    st.session_state.favorites.remove(ticker)
+
+                    st.session_state.confirm_delete_one = None
+        
+
+                if c_no.button("↩ Cancelar"):
+                    st.session_state.confirm_delete_one = None
+        
+
+            # ---- CONFIRMAR ELIMINAR TODOS ----
+            if st.session_state.confirm_delete_all:
+                st.error("⚠️ ¿Eliminar TODOS los favoritos?")
+
+                c_yes, c_no = st.columns(2)
+
+                if c_yes.button("🔥 Sí, eliminar todo"):
+                    user = st.session_state.get("username")
+                    persist_clear_favorites(user)
+                    st.session_state.favorites = []
+                    st.session_state.confirm_delete_all = False
+            
+
+                if c_no.button("↩ Cancelar"):
+                    st.session_state.confirm_delete_all = False
+        
+
+            st.divider()
+
+            # ---- EXPORT CSV ----
+            csv = pd.DataFrame(
+                st.session_state.favorites,
+                columns=["Ticker"]
+            ).to_csv(index=False)
+
+            st.download_button(
+                "⬇ Exportar favoritos",
+                csv,
+                "favoritos.csv"
+            )
+
+        else:
+            st.caption("Sin favoritos aún")
+        
+        st.markdown("---")
+        st.subheader("📈 Acciones")
+
+        company_query = st.text_input(
+            "🏢 Buscar empresa",
+            placeholder="Ej: Microsoft, Apple"
+        )
+
+        matches = [
+            name for name in STOCK_TICKERS
+            if company_query.lower() in name.lower()
+        ]
+
+        company = st.selectbox("Resultados", [""] + matches)
+
+        if len(matches) == 1:
+            ticker_found = STOCK_TICKERS[matches[0]]
+            st.success(f"Ticker encontrado: {ticker_found}")
+            st.session_state.selected_ticker = ticker_found
+
+        elif len(matches) > 1:    
+            st.info("Coincidencias encontradas:")    
+            company_selected = st.selectbox("Seleccioná una", matches)
+
+            ticker_found = STOCK_TICKERS[company_selected]
+            st.session_state.selected_ticker = ticker_found
+
+        else:
+            st.warning("Empresa no encontrada (solo tickers demo disponibles)")
+
+        st.subheader("🟣 Criptomonedas")
+
+        crypto_query = st.text_input(
+            "Buscar cripto (nombre o símbolo)",
+            placeholder="Ej: bitcoin, btc, eth"
+        )
+
+        matches = [
+            name for name, t in CRYPTO_TICKERS.items()
+            if crypto_query.lower() in name.lower()
+            or crypto_query.lower() in t.lower()
+        ]
+
+        crypto = st.selectbox("Resultados", [""] + matches)
+
+        if crypto:
+            st.session_state.selected_ticker = CRYPTO_TICKERS[crypto]
+      
+
+    # ================= SELECCIÓN CENTRAL =================
+    st.subheader("Selección de activo")
 
     if "selected_ticker" not in st.session_state:
         st.session_state.selected_ticker = ""
 
-    # ==================================================
-    # SIDEBAR
-    # ==================================================
-    with st.sidebar:
-        st.subheader("🔍 Acciones")
+    stocks = [t for t in DEMO_TICKERS if not t.endswith(".CRYPTO")]
+    cryptos = [t for t in DEMO_TICKERS if t.endswith(".CRYPTO")]
 
-        q_stock = st.text_input("Buscar empresa o ticker")
-        stock_matches = [
-            f"{n} ({t})"
-            for n,t in STOCK_TICKERS.items()
-            if q_stock.lower() in n.lower() or q_stock.lower() in t.lower()
-        ]
+    SELECTABLE_TICKERS = (
+        [""] +
+        [f"📈 {v}" for v in STOCK_TICKERS.values()] +
+        ["— CRIPTOMONEDAS —"] +
+        [f"🟣 {v}" for v in CRYPTO_TICKERS.values()]
+    )
 
-        sel_stock = st.selectbox("Resultados acciones", [""] + stock_matches)
-        if sel_stock:
-            st.session_state.selected_ticker = sel_stock.split("(")[1].replace(")","")
+    ticker_label = st.selectbox(
+        "Elegí un ticker para comenzar",
+        SELECTABLE_TICKERS,
+        index=SELECTABLE_TICKERS.index(st.session_state.selected_ticker)
+        if st.session_state.get("selected_ticker") in SELECTABLE_TICKERS else 0
+    )
 
-        st.divider()
-        st.subheader("🟣 Criptomonedas")
-
-        q_crypto = st.text_input("Buscar cripto o ticker")
-        crypto_matches = [
-            f"{n} ({t})"
-            for n,t in CRYPTO_TICKERS.items()
-            if q_crypto.lower() in n.lower() or q_crypto.lower() in t.lower()
-        ]
-
-        sel_crypto = st.selectbox("Resultados cripto", [""] + crypto_matches)
-        if sel_crypto:
-            st.session_state.selected_ticker = sel_crypto.split("(")[1].replace(")","")
-
-        st.divider()
-        st.subheader("⭐ Favoritos")
-
-        stocks = [f for f in st.session_state.favorites if not f.endswith(".CRYPTO")]
-        cryptos = [f for f in st.session_state.favorites if f.endswith(".CRYPTO")]
-
-        st.caption("Acciones")
-        for f in stocks:
-            st.write("•", f)
-
-        st.caption("Cripto")
-        for f in cryptos:
-            st.write("•", f)
-
-        if st.session_state.favorites:
-            csv = pd.DataFrame({"Ticker": st.session_state.favorites}).to_csv(index=False)
-            st.download_button("⬇ Exportar CSV", csv, "favoritos.csv")
-
-    # ==================================================
-    # MAIN
-    # ==================================================
-    if not st.session_state.selected_ticker:
-        st.info("Seleccioná una acción o cripto desde el sidebar")
+    if ticker_label in ("", "--- CRIPTOMONEDAS ---"):
+        st.info("👆 Seleccioná un activo para ver el dashboard")
         return
 
-    ticker = st.session_state.selected_ticker
+    ticker = (
+        ticker_label
+        .replace("📈 ", "")
+        .replace("🟣 ", "")
+    )
 
-    st.subheader(f"{ticker} — {asset_type(ticker)}")
-    st.caption(market_status(ticker))
+    st.session_state.selected_ticker = ticker
 
-    # FLAGS
-    st.markdown("### 🚩 Flags")
-    for f in ASSET_FLAGS.get(ticker, []):
-        st.write(f)
+    # ================= FLAGS =================
+    flags = ASSET_FLAGS.get(ticker, [])
+    if flags:
+        st.markdown("### 🚩 Flags")
+        for f in flags:
+            st.warning(f)
 
-    # ALERTAS
-    if ticker in PRICE_ALERTS:
-        st.warning(PRICE_ALERTS[ticker][0])
+    # ================= TIMEFRAME (SUTIL) =================
+    tf_map = {"1M": 30, "3M": 90, "6M": 180, "1Y": 365}
 
-    alerts = SMART_ALERTS.get(ticker, {})
-    if alerts.get("pump"):
-        st.error("🔥 Pump detectado")
-    if alerts.get("rapid_move"):
-        st.warning("⏱️ Movimiento brusco")
-    if alerts.get("volatility",0)>10:
-        st.warning(f"🌪️ Volatilidad {alerts['volatility']}%")
-
-    # TIMEFRAME
-    c1,c2 = st.columns(2)
+    c1, c2 = st.columns([2, 1])
     with c1:
-        tf = st.selectbox("Rango rápido", ["1M","3M","6M","1Y"])
-    with c2:
-        start = st.date_input("Desde", datetime.today()-timedelta(days=180))
-        end = st.date_input("Hasta", datetime.today())
+        tf = st.radio(
+            "Rango",
+            tf_map.keys(),
+            horizontal=True,
+            label_visibility="collapsed"
+        )
 
-    days = {"1M":30,"3M":90,"6M":180,"1Y":365}[tf]
-    start = datetime.today()-timedelta(days=days)
+    with c2:
+        with st.expander("Desde / Hasta"):
+            start = st.date_input(
+                "Desde",
+                datetime.today() - timedelta(days=tf_map[tf])
+            )
+            end = st.date_input("Hasta", datetime.today())
+
+    # ================= DATA SAFE =================
+    if end <= start:
+        st.error("El rango de fechas no es válido")
+        return
+
     df = demo_ohlc(start, end)
 
+    # ================= GRAPH =================
     fig = go.Figure()
     fig.add_candlestick(
         x=df["date"],
         open=df["open"],
         high=df["high"],
         low=df["low"],
-        close=df["close"]
+        close=df["close"],
+        name="Precio"
     )
-    fig.add_scatter(x=df["date"], y=df["SMA20"], name="SMA20")
-    fig.add_scatter(x=df["date"], y=df["EMA20"], name="EMA20")
+    fig.add_scatter(x=df["date"], y=df["SMA20"], name="SMA 20")
+    fig.add_scatter(x=df["date"], y=df["EMA20"], name="EMA 20")
+
     st.plotly_chart(fig, use_container_width=True)
 
+    # ================= ALERTAS =================
+    if ticker in PRICE_ALERTS:
+        msg, _ = PRICE_ALERTS[ticker]
+        st.warning(msg)
+
+    smart = SMART_ALERTS.get(ticker, {})
+    if smart:
+        st.markdown("### 🧠 Alertas inteligentes")
+        if smart.get("pump"):
+            st.error("🔥 Pump detectado")
+        if smart.get("rapid_move"):
+            st.warning("⏱️ Movimiento brusco")
+        if smart.get("volatility", 0) > 10:
+            st.warning(f"🌪️ Volatilidad {smart['volatility']}%")
+
+    # ================= RIESGO =================
+    st.metric("⚠️ Riesgo", f"{risk_score(ticker)}/100")
+
+    # ================= FAVORITOS =================
     if st.button("⭐ Agregar a favoritos"):
         if ticker not in st.session_state.favorites:
             persist_add_favorite(user, ticker)
             st.session_state.favorites.append(ticker)
 
-    # OVERVIEW
+    # ================= OVERVIEW =================
     ov = demo_overview(ticker)
-    st.subheader("📋 Resumen Ejecutivo")
+
+    st.subheader("📋 Resumen ejecutivo")
     st.json(ov["executive"])
 
     st.subheader("📊 Fundamentales")
-    st.table(pd.DataFrame.from_dict(ov["fundamentals"], orient="index", columns=["Valor"]))
-
+    st.table(pd.DataFrame.from_dict(
+        ov["fundamentals"], orient="index", columns=["Valor"]
+    ))
+    
     st.subheader("🏭 Competidores")
     st.write(", ".join(ov["competitors"]))
 
@@ -288,10 +449,18 @@ def show_dashboard():
 
     if rows:
         st.table(pd.DataFrame(rows).sort_values("Score", ascending=False))
-
-    # RECOMENDADO
+        
+    # ================= RECOMENDADO =================
     st.subheader("🧠 Recomendado para vos")
     rec = recommend_for_user(st.session_state.favorites)
     if rec:
         st.success(f"Podría interesarte: {rec}")
+    else:
+        st.caption("Agregá favoritos para recomendaciones")
 
+    st.caption("Modo DEMO — arquitectura lista para producción")
+
+
+
+
+    
