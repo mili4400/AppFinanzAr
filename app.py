@@ -22,18 +22,17 @@ if st.session_state.get("logged_in", False):
         st.write(f"Bienvenido, **{st.session_state.get('username','')}**")
 
         if st.button("🔒 Cerrar sesión"):
-            # --- reset login ---
+            # preservar solo el auth_manager
+            auth_manager = st.session_state.get("auth_manager")
+
+            # limpiar TODA la sesión
+            for k in list(st.session_state.keys()):
+                del st.session_state[k]
+
+            # restaurar auth_manager
+            st.session_state["auth_manager"] = auth_manager
             st.session_state["logged_in"] = False
             st.session_state["username"] = ""
-
-            # --- reset estados del dashboard ---
-            for k in [
-                "favorites",
-                "confirm_delete_one",
-                "confirm_delete_all",
-            ]:
-                if k in st.session_state:
-                    del st.session_state[k]
 
             st.rerun()
 
