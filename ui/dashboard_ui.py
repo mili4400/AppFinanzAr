@@ -146,102 +146,150 @@ def show_dashboard():
 
     # ================= SIDEBAR =================
     with st.sidebar:
+        # ======================================================
+        # ESTADO DEL MERCADO
+        # ======================================================
         st.subheader("🕒 Estado del mercado")
-        if ticker:
-            st.write(market_status(ticker))
+
+        if st.session_state.selected_ticker:
+            st.write(market_status(st.session_state.selected_ticker))
         else:
             st.caption("Seleccioná un activo")
 
         st.divider()
+
+        # ======================================================
+        # FAVORITOS
+        # ======================================================
         st.subheader("⭐ Favoritos")
 
-        if st.session_state.favorites:
-            stocks, cryptos = [], []
+        # --- filtro visual (NO borra nada) ---
+        fav_filter = st.radio(
+            "Ver",
+            ["Todos", "Acciones", "Cripto"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
 
-            for f in st.session_state.favorites:
-                if asset_type(f) == "crypto":
-                    cryptos.append(f)
-                else:
-                    stocks.append(f)
+        # normalización defensiva (evita crashes)
+        if not isinstance(st.session_state.favorites, list):
+            st.session_state.favorites = list(st.session_state.favorites or [])
 
-            if stocks:
-                st.markdown("📈 **Acciones**")
-                for f in stocks:
-                    c1, c2 = st.columns([6,1])
-                    c1.write(f"• {f}")
-                    if c2.button("❌", key=f"del_{f}"):
-                        st.session_state.confirm_delete_one = f
-                        st.session_state.confirm_delete_all = False
+        # aplicar filtro
+        filtered_favs = []
+        for f in st.session_state.favorites:
+            if fav_filter == "Todos":
+                filtered_favs.append(f)
+            elif fav_filter == "Acciones" and not f.endswith(".CRYPTO"):
+                filtered_favs.append(f)
+            elif fav_filter == "Cripto" and f.endswith(".CRYPTO"):
+                filtered_favs.append(f)
 
-            if cryptos:
-                st.markdown("🟣 **Cripto**")
-                for f in cryptos:
-                    c1, c2 = st.columns([6,1])
-                    c1.write(f"• {f}")
-                    if c2.button("❌", key=f"del_{f}"):
-                        st.session_state.confirm_delete_one = f
-                        st.session_state.confirm_delete_all = False
+        if filtered_favs:
+            for f in filtered_favs:
+                icon = "🟣" if f.endswith(".CRYPTO") else "📈"
 
-            st.divider()
+                c1, c2 = st.columns([8, 1])
+                if c1.button(f"{icon} {f}", key=f"sel_{f}"):
+                    st.session_state.selected_ticker = f
 
-            if st.button("🧹 Eliminar todos"):
-                st.session_state.confirm_delete_all = True
+                if c2.button("❌", key=f"del_{f}"):
+                    st.session_state.confirm_delete_one = f
+                    st.session_state.confirm_delete_all = False
+        else:
+            st.caption("Sin favoritos para este filtro")
+
+        # --- confirmación borrar uno ---
+        if st.session_state.confirm_delete_one:
+            st.warning(f"¿Eliminar {st.session_state.confirm_delete_one}?")
+            c_yes, c_no = st.columns(2)
+
+            if c_yes.button("Sí"):
+                persist_remove_favorite(
+                    st.session_state.username,
+                    st.session_state.confirm_delete_one
+                )
+                if st.session_state.confirm_delete_one in st.session_state.favorites:
+                    st.session_state.favorites.remove(st.session_state.confirm_delete_one)
                 st.session_state.confirm_delete_one = None
 
-            if st.session_state.confirm_delete_one:
-                st.warning(f"¿Eliminar {st.session_state.confirm_delete_one}?")
-                c_yes, c_no = st.columns(2)
-
-                if c_yes.button("✅ Sí"):
-                    persist_remove_favorite(user, st.session_state.confirm_delete_one)
-                    st.session_state.favorites.remove(st.session_state.confirm_delete_one)
-                    st.session_state.confirm_delete_one = None
-
-                if c_no.button("↩ Cancelar"):
-                    st.session_state.confirm_delete_one = None
-
-            if st.session_state.confirm_delete_all:
-                st.error("⚠️ ¿Eliminar TODOS?")
-                c_yes, c_no = st.columns(2)
-
-                if c_yes.button("🔥 Sí"):
-                    persist_clear_favorites(user)
-                    st.session_state.favorites = []
-                    st.session_state.confirm_delete_all = False
-
-                if c_no.button("↩ Cancelar"):
-                    st.session_state.confirm_delete_all = False
-
-            st.divider()
-            csv = pd.DataFrame(st.session_state.favorites, columns=["Ticker"]).to_csv(index=False)
-            st.download_button("⬇ Exportar favoritos", csv, "favoritos.csv")
-
-        else:
-            st.caption("Sin favoritos aún")
+            if c_no.button("Cancelar"):
+                st.session_state.confirm_delete_one = None
 
         st.divider()
-        st.subheader("🔍 Buscar activo")
 
-        label_map = (
-            [""] +
-            [f"📈 {v}" for v in STOCK_TICKERS.values()] +
-            ["— CRIPTOMONEDAS —"] +
-            [f"🟣 {v}" for v in CRYPTO_TICKERS.values()]
+        # --- acciones globales ---
+        if st.button("🧹 Eliminar todos"):
+            st.session_state.confirm_delete_all = True
+
+        if st.session_state.confirm_delete_all:
+            st.error("⚠️ ¿Eliminar TODOS los favoritos?")
+            c_yes, c_no = st.columns(2)
+
+            if c_yes.button("Eliminar todo"):
+                persist_clear_favorites(st.session_state.username)
+                st.session_state.favorites = []
+                st.session_state.confirm_delete_all = False
+
+            if c_no.button("Cancelar"):
+                st.session_state.confirm_delete_all = False
+
+        if st.session_state.favorites:
+            csv = pd.DataFrame(
+                st.session_state.favorites,
+                columns=["Ticker"]
+            ).to_csv(index=False)
+
+            st.download_button(
+                "⬇ Exportar favoritos",
+                csv,
+                "favoritos.csv"
+            )
+
+        st.divider()
+
+        # ======================================================
+        # BUSCAR EMPRESA (ACCIONES)
+        # ======================================================
+        st.subheader("🔍 Buscar empresa")
+
+        company_names = list(STOCK_TICKERS.keys())
+        company = st.selectbox(
+            "Empresa",
+            [""] + company_names,
+            index=0
         )
 
-        current_label = (
-            f"📈 {ticker}" if ticker.endswith((".US",".BA"))
-            else f"🟣 {ticker}" if ticker else ""
+        if company:
+            ticker = STOCK_TICKERS[company]
+            st.caption(f"Empresa: {company}")
+            st.caption(f"Ticker: {ticker}")
+
+            if st.button("Ver en dashboard", key="select_company"):
+                st.session_state.selected_ticker = ticker
+
+        st.divider()
+
+        # ======================================================
+        # BUSCAR CRIPTOMONEDA
+        # ======================================================
+        st.subheader("🟣 Buscar criptomoneda")
+
+        crypto_names = list(CRYPTO_TICKERS.keys())
+        crypto = st.selectbox(
+            "Cripto",
+            [""] + crypto_names,
+            index=0
         )
 
-        selected = st.selectbox(
-            "Ticker",
-            label_map,
-            index=label_map.index(current_label) if current_label in label_map else 0
-        )
+        if crypto:
+            ticker = CRYPTO_TICKERS[crypto]
+            st.caption(f"Cripto: {crypto}")
+            st.caption(f"Ticker: {ticker}")
 
-        if selected not in ("", "— CRIPTOMONEDAS —"):
-            st.session_state.selected_ticker = selected.replace("📈 ","").replace("🟣 ","")
+            if st.button("Ver en dashboard", key="select_crypto"):
+                st.session_state.selected_ticker = ticker
+
 
     # ================= MAIN =================
     if not st.session_state.selected_ticker:
@@ -254,23 +302,96 @@ def show_dashboard():
     for f in flags:
         st.warning(f)
 
-    tf_map = {"1M":30,"3M":90,"6M":180,"1Y":365}
-    tf = st.radio("Rango", tf_map.keys(), horizontal=True)
+    from datetime import date, timedelta
 
-    start = st.date_input("Desde", datetime.today()-timedelta(days=tf_map[tf]))
-    end = st.date_input("Hasta", datetime.today())
+    # ======================================================
+    # RANGO TEMPORAL
+    # ======================================================
 
-    if end <= start:
+    st.subheader("📅 Rango temporal")
+
+    today = date.today()
+
+    # --- init defensivo ---
+    if "time_range" not in st.session_state:
+        st.session_state.time_range = "3M"
+
+    if "start_date" not in st.session_state:
+        st.session_state.start_date = today - timedelta(days=90)
+
+    if "end_date" not in st.session_state:
+        st.session_state.end_date = today
+
+    # --- botones rápidos ---
+    ranges = {
+        "1D": 1,
+        "5D": 5,
+        "1M": 30,
+        "3M": 90,
+        "6M": 180,
+        "1Y": 365,
+        "MAX": None
+    }
+
+    cols = st.columns(len(ranges) + 1)
+
+    for i, (label, days) in enumerate(ranges.items()):
+        if cols[i].button(label, key=f"range_{label}"):
+            st.session_state.time_range = label
+            if days:
+                st.session_state.start_date = today - timedelta(days=days)
+                st.session_state.end_date = today
+            else:
+                st.session_state.start_date = None
+                st.session_state.end_date = None
+
+    # --- personalizado ---
+    custom_col.markdown("📅 **Personalizado**")
+
+    if st.session_state.time_range == "CUSTOM":
+        c1, c2 = st.columns(2)
+
+        new_start = c1.date_input(
+            "Desde",
+            value=st.session_state.start_date or today - timedelta(days=30),
+            label_visibility="collapsed"
+        )
+
+        new_end = c2.date_input(
+            "Hasta",
+            value=st.session_state.end_date or today,
+            label_visibility="collapsed"
+        )
+
+        st.session_state.start_date = new_start
+        st.session_state.end_date = new_end
+
+    # activar modo custom
+    if custom_col.button("📅"):
+    st.session_state.time_range = "CUSTOM"
+
+    start = st.session_state.start_date
+    end = st.session_state.end_date
+
+    if start and end and end <= start:
         st.error("Rango inválido")
         return
 
     df = demo_ohlc(start, end)
 
     fig = go.Figure()
-    fig.add_candlestick(x=df["date"], open=df["open"], high=df["high"], low=df["low"], close=df["close"])
+    fig.add_candlestick(
+        x=df["date"],
+        open=df["open"],
+        high=df["high"],
+        low=df["low"],
+        close=df["close"]
+    )
     fig.add_scatter(x=df["date"], y=df["SMA20"], name="SMA 20")
     fig.add_scatter(x=df["date"], y=df["EMA20"], name="EMA 20")
+
     st.plotly_chart(fig, use_container_width=True)
+
 
     if ticker in PRICE_ALERTS:
         st.warning(PRICE_ALERTS[ticker][0])
@@ -378,11 +499,20 @@ def show_dashboard():
             .reset_index(drop=True)
         )
 
-        st.table(df_rank)
+        current = st.session_state.selected_ticker
+
+        df_rank["◀"] = df_rank["Ticker"].apply(
+            lambda x: "👁️" if x == current else ""
+        )
+
+        df_rank = df_rank[["◀", "Ticker", "Riesgo", "Score"]]
+
+        st.caption("Ordenado por score (mayor es mejor)")
+        st.dataframe(df_rank, use_container_width=True, hide_index=True)
 
     else:
         st.caption("Agregá activos a favoritos para ver tu ranking personalizado")
-
+    
     
     # ================= RECOMENDADO =================
     st.subheader("🧠 Recomendado para vos")
