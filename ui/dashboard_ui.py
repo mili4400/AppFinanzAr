@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time, date
 
 from core.favorites import (
     load_favorites,
@@ -49,25 +49,17 @@ ASSET_FLAGS = {
     "GGAL.BA": ["Mercado local", "Demo data"],
 }
 
-DEMO_TICKERS = list(STOCK_TICKERS.values()) + list(CRYPTO_TICKERS.values())
-
 # ======================================================
 # HELPERS
 # ======================================================
-def asset_type(t):
-    if t.endswith(".CRYPTO"):
-        return "crypto"
-    if t.endswith(".BA"):
-        return "arg_stock"
-    return "us_stock"
-
 def market_status(t):
     now = datetime.now().time()
     if t.endswith(".CRYPTO"):
         return "🟣 Cripto 24/7"
     if t.endswith(".BA"):
-        return "🟢 BYMA abierto" if time(11,0) <= now <= time(17,0) else "🔴 BYMA cerrado"
-    return "🟢 Wall Street abierto" if time(9,30) <= now <= time(16,0) else "🔴 Wall Street cerrado"
+        return "🟢 BYMA abierto" if time(11, 0) <= now <= time(17, 0) else "🔴 BYMA cerrado"
+    return "🟢 Wall Street abierto" if time(9, 30) <= now <= time(16, 0) else "🔴 Wall Street cerrado"
+
 
 def demo_ohlc(start, end):
     days = max((end - start).days, 30)
@@ -78,11 +70,12 @@ def demo_ohlc(start, end):
         "open": price + np.random.randn(days),
         "close": price,
     })
-    df["high"] = df[["open","close"]].max(axis=1) + abs(np.random.randn(days))
-    df["low"] = df[["open","close"]].min(axis=1) - abs(np.random.randn(days))
+    df["high"] = df[["open", "close"]].max(axis=1) + abs(np.random.randn(days))
+    df["low"] = df[["open", "close"]].min(axis=1) - abs(np.random.randn(days))
     df["SMA20"] = df["close"].rolling(20).mean()
     df["EMA20"] = df["close"].ewm(span=20).mean()
     return df
+
 
 def risk_score(t):
     score = 20 if t.endswith(".CRYPTO") else 10
@@ -93,12 +86,13 @@ def risk_score(t):
         score += 20
     return min(score, 100)
 
+
 def demo_overview(t):
     return {
         "executive": {
             "Ticker": t,
             "Sector": "Technology",
-            "Score Global": round(np.random.uniform(40,90),2)
+            "Score Global": round(np.random.uniform(40, 90), 2)
         },
         "fundamentals": {
             "Revenue": "1200M",
@@ -113,27 +107,29 @@ def demo_overview(t):
         ]
     }
 
-def recommend_for_user(favs):
-    if not favs:
-        return None
-    safe = [f for f in favs if risk_score(f) < 60]
-    return safe[0] if safe else favs[0]
 
 # ======================================================
-# DASHBOARD
+# STATE INIT
 # ======================================================
-def show_dashboard():
-    st.title("📊 AppFinanzAr")
-
-    # ================= SESSION SAFE =================
+def init_state():
     if "username" not in st.session_state:
         st.session_state.username = "demo_user"
 
     if "selected_ticker" not in st.session_state:
-        st.session_state.selected_ticker = ""
+        st.session_state.selected_ticker = None
 
     if "favorites" not in st.session_state:
         st.session_state.favorites = load_favorites(st.session_state.username)
+
+    if "scores" not in st.session_state:
+        st.session_state.scores = {}
+
+    if "preferences" not in st.session_state:
+        st.session_state.preferences = {
+            "time_range": "3M",
+            "max_risk": 100,
+            "order_by": "Score"
+        }
 
     if "confirm_delete_one" not in st.session_state:
         st.session_state.confirm_delete_one = None
@@ -141,16 +137,17 @@ def show_dashboard():
     if "confirm_delete_all" not in st.session_state:
         st.session_state.confirm_delete_all = False
 
-    user = st.session_state.username
-    ticker = st.session_state.selected_ticker
+
+# ======================================================
+# DASHBOARD
+# ======================================================
+def show_dashboard():
+    init_state()
+    st.title("📊 AppFinanzAr")
 
     # ================= SIDEBAR =================
     with st.sidebar:
-        # ======================================================
-        # ESTADO DEL MERCADO
-        # ======================================================
         st.subheader("🕒 Estado del mercado")
-
         if st.session_state.selected_ticker:
             st.write(market_status(st.session_state.selected_ticker))
         else:
@@ -158,138 +155,58 @@ def show_dashboard():
 
         st.divider()
 
-        # ======================================================
-        # FAVORITOS
-        # ======================================================
+        # ---------- FAVORITOS ----------
         st.subheader("⭐ Favoritos")
 
-        # --- filtro visual (NO borra nada) ---
-        fav_filter = st.radio(
-            "Ver",
-            ["Todos", "Acciones", "Cripto"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
-
-        # normalización defensiva (evita crashes)
-        if not isinstance(st.session_state.favorites, list):
-            st.session_state.favorites = list(st.session_state.favorites or [])
-
-        # aplicar filtro
-        filtered_favs = []
-        for f in st.session_state.favorites:
-            if fav_filter == "Todos":
-                filtered_favs.append(f)
-            elif fav_filter == "Acciones" and not f.endswith(".CRYPTO"):
-                filtered_favs.append(f)
-            elif fav_filter == "Cripto" and f.endswith(".CRYPTO"):
-                filtered_favs.append(f)
-
-        if filtered_favs:
-            for f in filtered_favs:
-                icon = "🟣" if f.endswith(".CRYPTO") else "📈"
-
+        if st.session_state.favorites:
+            for f in st.session_state.favorites:
                 c1, c2 = st.columns([8, 1])
-                if c1.button(f"{icon} {f}", key=f"sel_{f}"):
+                if c1.button(f, key=f"sel_{f}"):
                     st.session_state.selected_ticker = f
-
                 if c2.button("❌", key=f"del_{f}"):
                     st.session_state.confirm_delete_one = f
-                    st.session_state.confirm_delete_all = False
         else:
-            st.caption("Sin favoritos para este filtro")
+            st.caption("Sin favoritos")
 
-        # --- confirmación borrar uno ---
         if st.session_state.confirm_delete_one:
             st.warning(f"¿Eliminar {st.session_state.confirm_delete_one}?")
-            c_yes, c_no = st.columns(2)
-
-            if c_yes.button("Sí"):
+            c1, c2 = st.columns(2)
+            if c1.button("Sí"):
                 persist_remove_favorite(
                     st.session_state.username,
                     st.session_state.confirm_delete_one
                 )
-                if st.session_state.confirm_delete_one in st.session_state.favorites:
-                    st.session_state.favorites.remove(st.session_state.confirm_delete_one)
+                st.session_state.favorites.remove(
+                    st.session_state.confirm_delete_one
+                )
+                st.session_state.confirm_delete_one = None
+                st.rerun()
+            if c2.button("Cancelar"):
                 st.session_state.confirm_delete_one = None
 
-            if c_no.button("Cancelar"):
-                st.session_state.confirm_delete_one = None
-
-        st.divider()
-
-        # --- acciones globales ---
         if st.button("🧹 Eliminar todos"):
-            st.session_state.confirm_delete_all = True
-
-        if st.session_state.confirm_delete_all:
-            st.error("⚠️ ¿Eliminar TODOS los favoritos?")
-            c_yes, c_no = st.columns(2)
-
-            if c_yes.button("Eliminar todo"):
-                persist_clear_favorites(st.session_state.username)
-                st.session_state.favorites = []
-                st.session_state.confirm_delete_all = False
-
-            if c_no.button("Cancelar"):
-                st.session_state.confirm_delete_all = False
-
-        if st.session_state.favorites:
-            csv = pd.DataFrame(
-                st.session_state.favorites,
-                columns=["Ticker"]
-            ).to_csv(index=False)
-
-            st.download_button(
-                "⬇ Exportar favoritos",
-                csv,
-                "favoritos.csv"
-            )
+            persist_clear_favorites(st.session_state.username)
+            st.session_state.favorites = []
+            st.session_state.selected_ticker = None
+            st.rerun()
 
         st.divider()
 
-        # ======================================================
-        # BUSCAR EMPRESA (ACCIONES)
-        # ======================================================
+        # ---------- BUSCAR EMPRESA ----------
         st.subheader("🔍 Buscar empresa")
-
-        company_names = list(STOCK_TICKERS.keys())
-        company = st.selectbox(
-            "Empresa",
-            [""] + company_names,
-            index=0
-        )
-
+        company = st.selectbox("Empresa", [""] + list(STOCK_TICKERS.keys()))
         if company:
-            ticker = STOCK_TICKERS[company]
-            st.caption(f"Empresa: {company}")
-            st.caption(f"Ticker: {ticker}")
-
-            if st.button("Ver en dashboard", key="select_company"):
-                st.session_state.selected_ticker = ticker
+            if st.button("Ver"):
+                st.session_state.selected_ticker = STOCK_TICKERS[company]
 
         st.divider()
 
-        # ======================================================
-        # BUSCAR CRIPTOMONEDA
-        # ======================================================
-        st.subheader("🟣 Buscar criptomoneda")
-
-        crypto_names = list(CRYPTO_TICKERS.keys())
-        crypto = st.selectbox(
-            "Cripto",
-            [""] + crypto_names,
-            index=0
-        )
-
+        # ---------- BUSCAR CRIPTO ----------
+        st.subheader("🟣 Buscar cripto")
+        crypto = st.selectbox("Cripto", [""] + list(CRYPTO_TICKERS.keys()))
         if crypto:
-            ticker = CRYPTO_TICKERS[crypto]
-            st.caption(f"Cripto: {crypto}")
-            st.caption(f"Ticker: {ticker}")
-
-            if st.button("Ver en dashboard", key="select_crypto"):
-                st.session_state.selected_ticker = ticker
-
+            if st.button("Ver cripto"):
+                st.session_state.selected_ticker = CRYPTO_TICKERS[crypto]
 
     # ================= MAIN =================
     if not st.session_state.selected_ticker:
@@ -298,86 +215,39 @@ def show_dashboard():
 
     ticker = st.session_state.selected_ticker
 
-    flags = ASSET_FLAGS.get(ticker, [])
-    for f in flags:
+    # ---------- FLAGS ----------
+    for f in ASSET_FLAGS.get(ticker, []):
         st.warning(f)
 
-    from datetime import date, timedelta
-
-    # ======================================================
-    # RANGO TEMPORAL
-    # ======================================================
-
+    # ---------- RANGO TEMPORAL ----------
     st.subheader("📅 Rango temporal")
-
     today = date.today()
-
-    # --- init defensivo ---
-    if "time_range" not in st.session_state:
-        st.session_state.time_range = "3M"
 
     if "start_date" not in st.session_state:
         st.session_state.start_date = today - timedelta(days=90)
-
     if "end_date" not in st.session_state:
         st.session_state.end_date = today
 
-    # --- botones rápidos ---
     ranges = {
-        "1D": 1,
-        "5D": 5,
-        "1M": 30,
-        "3M": 90,
-        "6M": 180,
-        "1Y": 365,
-        "MAX": None
+        "1M": 30, "3M": 90, "6M": 180, "1Y": 365
     }
 
     cols = st.columns(len(ranges) + 1)
-
     for i, (label, days) in enumerate(ranges.items()):
-        if cols[i].button(label, key=f"range_{label}"):
-            st.session_state.time_range = label
-            if days:
-                st.session_state.start_date = today - timedelta(days=days)
-                st.session_state.end_date = today
-            else:
-                st.session_state.start_date = None
-                st.session_state.end_date = None
+        if cols[i].button(label):
+            st.session_state.start_date = today - timedelta(days=days)
+            st.session_state.end_date = today
 
-    # --- personalizado ---
-    custom_col.markdown("📅 **Personalizado**")
-
-    if st.session_state.time_range == "CUSTOM":
+    if cols[-1].button("📅"):
         c1, c2 = st.columns(2)
-
-        new_start = c1.date_input(
-            "Desde",
-            value=st.session_state.start_date or today - timedelta(days=30),
-            label_visibility="collapsed"
+        st.session_state.start_date = c1.date_input(
+            "Desde", st.session_state.start_date
+        )
+        st.session_state.end_date = c2.date_input(
+            "Hasta", st.session_state.end_date
         )
 
-        new_end = c2.date_input(
-            "Hasta",
-            value=st.session_state.end_date or today,
-            label_visibility="collapsed"
-        )
-
-        st.session_state.start_date = new_start
-        st.session_state.end_date = new_end
-
-    # activar modo custom
-    if custom_col.button("📅"):
-    st.session_state.time_range = "CUSTOM"
-
-    start = st.session_state.start_date
-    end = st.session_state.end_date
-
-    if start and end and end <= start:
-        st.error("Rango inválido")
-        return
-
-    df = demo_ohlc(start, end)
+    df = demo_ohlc(st.session_state.start_date, st.session_state.end_date)
 
     fig = go.Figure()
     fig.add_candlestick(
@@ -389,141 +259,87 @@ def show_dashboard():
     )
     fig.add_scatter(x=df["date"], y=df["SMA20"], name="SMA 20")
     fig.add_scatter(x=df["date"], y=df["EMA20"], name="EMA 20")
-
     st.plotly_chart(fig, use_container_width=True)
 
-
-    if ticker in PRICE_ALERTS:
-        st.warning(PRICE_ALERTS[ticker][0])
-
-    smart = SMART_ALERTS.get(ticker, {})
-    if smart:
-        st.subheader("🧠 Alertas inteligentes")
-        if smart.get("pump"):
-            st.error("🔥 Pump detectado")
-        if smart.get("rapid_move"):
-            st.warning("⏱ Movimiento brusco")
-        if smart.get("volatility",0) > 10:
-            st.warning(f"🌪 Volatilidad {smart['volatility']}%")
-
-    st.metric("⚠️ Riesgo", f"{risk_score(ticker)}/100")
-
+    # ---------- FAVORITO ----------
     if st.button("⭐ Agregar a favoritos"):
         if ticker not in st.session_state.favorites:
-            persist_add_favorite(user, ticker)
+            persist_add_favorite(st.session_state.username, ticker)
             st.session_state.favorites.append(ticker)
 
-    ov = demo_overview(ticker)
+        if ticker not in st.session_state.scores:
+            st.session_state.scores[ticker] = round(
+                np.random.uniform(40, 90), 2
+            )
 
+    # ---------- OVERVIEW ----------
+    ov = demo_overview(ticker)
     st.subheader("📋 Resumen ejecutivo")
     st.json(ov["executive"])
 
-    st.subheader("📊 Fundamentales")
-    st.table(pd.DataFrame.from_dict(ov["fundamentals"], orient="index", columns=["Valor"]))
-
-    st.subheader("🏭 Competidores")
-    st.write(", ".join(ov["competitors"]))
-
     st.subheader("📰 Noticias & Sentimiento")
-
-    sentiments = []
-
     for n in ov["news"]:
-        s = n.get("sentiment", 0)
-        sentiments.append(s)
-
+        s = n["sentiment"]
         if s > 0.2:
-            st.success(f"🟢 {n['title']}  (sentimiento {s:+.2f})")
+            st.success(n["title"])
         elif s < -0.2:
-            st.error(f"🔴 {n['title']}  (sentimiento {s:+.2f})")
+            st.error(n["title"])
         else:
-            st.info(f"🟡 {n['title']}  (sentimiento {s:+.2f})")
+            st.info(n["title"])
 
-    if sentiments:
-        avg = sum(sentiments) / len(sentiments)
-        st.metric("📊 Sentimiento promedio", f"{avg:+.2f}")
-
-
-    # ================= ETF FINDER =================
-    st.subheader("🧭 ETF Finder")
-
-    tema = st.selectbox("Tema de inversión", ETF_THEMES)
-
-    if st.button("Buscar ETFs"):
-        st.table(pd.DataFrame([
-            {"ETF": "DEMO-ETF-TECH", "Tema": tema},
-            {"ETF": "DEMO-ETF-GLOBAL", "Tema": tema},
-            {"ETF": "DEMO-ETF-GROWTH", "Tema": tema},
-        ]))
-
-
-    # ================= COMPARACIÓN RÁPIDA =================
-    st.subheader("🔀 Comparación rápida")
-
-    c1, c2 = st.columns(2)
-
-    t1 = c1.selectbox(
-        "Ticker A",
-        DEMO_TICKERS,
-        key="compare_a"
-    )
-
-    t2 = c2.selectbox(
-        "Ticker B",
-        DEMO_TICKERS,
-        key="compare_b"
-    )
-
-    if st.button("Comparar"):
-        st.bar_chart({
-            t1: np.random.uniform(40, 90),
-            t2: np.random.uniform(40, 90)
-        })
-
-    # ================= RANKING PERSONALIZADO =================
+    # ================= RANKING =================
     st.subheader("🏆 Ranking personalizado")
 
     if st.session_state.favorites:
         rows = []
-
         for f in st.session_state.favorites:
+            if f not in st.session_state.scores:
+                st.session_state.scores[f] = round(
+                    np.random.uniform(40, 90), 2
+                )
             rows.append({
                 "Ticker": f,
                 "Riesgo": risk_score(f),
-                "Score": round(np.random.uniform(40, 90), 2)
+                "Score": st.session_state.scores[f]
             })
 
-        df_rank = (
-            pd.DataFrame(rows)
-            .sort_values("Score", ascending=False)
-            .reset_index(drop=True)
+        df_rank = pd.DataFrame(rows)
+        df_rank["Balance"] = df_rank["Score"] - df_rank["Riesgo"] * 0.5
+        df_rank = df_rank.sort_values("Balance", ascending=False)
+
+        edited = st.data_editor(
+            df_rank,
+            hide_index=True,
+            disabled=True,
+            key="ranking_editor"
         )
 
-        current = st.session_state.selected_ticker
+        sel = st.session_state.get("ranking_editor", {}).get("selected_rows")
+        if sel:
+            st.session_state.selected_ticker = df_rank.iloc[sel[0]]["Ticker"]
+            st.rerun()
 
-        df_rank["◀"] = df_rank["Ticker"].apply(
-            lambda x: "👁️" if x == current else ""
-        )
+        # ---------- COMPARACIÓN ----------
+        st.subheader("🔀 Comparación rápida")
+        tickers = df_rank["Ticker"].tolist()
+        t1, t2 = st.selectbox("A", tickers), st.selectbox("B", tickers, index=1)
+        if st.button("Comparar"):
+            st.bar_chart({
+                t1: st.session_state.scores[t1],
+                t2: st.session_state.scores[t2]
+            })
 
-        df_rank = df_rank[["◀", "Ticker", "Riesgo", "Score"]]
-
-        st.caption("Ordenado por score (mayor es mejor)")
-        st.dataframe(df_rank, use_container_width=True, hide_index=True)
+        # ---------- RECOMENDADO ----------
+        best = df_rank.iloc[0]["Ticker"]
+        st.subheader("🧠 Recomendado para vos")
+        if st.button(f"👉 Ver {best}"):
+            st.session_state.selected_ticker = best
+            st.rerun()
 
     else:
-        st.caption("Agregá activos a favoritos para ver tu ranking personalizado")
-    
-    
-    # ================= RECOMENDADO =================
-    st.subheader("🧠 Recomendado para vos")
-    rec = recommend_for_user(st.session_state.favorites)
-    if rec:
-        st.success(f"Podría interesarte: {rec}")
-    else:
-        st.caption("Agregá favoritos para recomendaciones")
+        st.caption("Agregá favoritos para ver ranking")
 
-    st.caption("Modo DEMO — arquitectura lista para producción")
-
+    st.caption("Modo DEMO — arquitectura lista para datos reales")
 
 
     
