@@ -254,22 +254,7 @@ def show_dashboard():
 
         else:
             st.caption("No tenés favoritos todavía")
-
-              # ---------- BUSCAR EMPRESA ----------
-        st.subheader("🔍 Buscar empresa")
-        company = st.selectbox("Empresa", [""] + list(STOCK_TICKERS.keys()))
-        if company:
-            if st.button("Ver"):
-                st.session_state.selected_ticker = STOCK_TICKERS[company]
-
-        st.divider()
-
-        # ---------- BUSCAR CRIPTO ----------
-        st.subheader("🟣 Buscar cripto")
-        crypto = st.selectbox("Cripto", [""] + list(CRYPTO_TICKERS.keys()))
-        if crypto:
-            if st.button("Ver cripto"):
-                st.session_state.selected_ticker = CRYPTO_TICKERS[crypto]
+            
 
     # ================= MAIN =================
     # ---------- SELECTOR PRINCIPAL ----------
