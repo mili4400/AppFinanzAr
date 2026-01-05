@@ -141,6 +141,8 @@ def init_state():
 # ======================================================
 # DASHBOARD
 # ======================================================
+ENABLE_ETF_FINDER = True
+
 def show_dashboard():
     init_state()
     st.title("📊 AppFinanzAr")
@@ -155,44 +157,66 @@ def show_dashboard():
 
         st.divider()
 
+    
         # ---------- FAVORITOS ----------
         st.subheader("⭐ Favoritos")
 
         if st.session_state.favorites:
             for f in st.session_state.favorites:
                 c1, c2 = st.columns([8, 1])
-                if c1.button(f, key=f"sel_{f}"):
+
+                if c1.button(f, key=f"fav_nav_{f}"):
                     st.session_state.selected_ticker = f
-                if c2.button("❌", key=f"del_{f}"):
+                    st.rerun()
+
+                if c2.button("❌", key=f"fav_del_{f}"):
                     st.session_state.confirm_delete_one = f
-        else:
-            st.caption("Sin favoritos")
 
-        if st.session_state.confirm_delete_one:
-            st.warning(f"¿Eliminar {st.session_state.confirm_delete_one}?")
-            c1, c2 = st.columns(2)
-            if c1.button("Sí"):
-                persist_remove_favorite(
-                    st.session_state.username,
-                    st.session_state.confirm_delete_one
+            # --- confirmación eliminar uno ---
+            if st.session_state.confirm_delete_one:
+                st.warning(
+                    f"¿Eliminar {st.session_state.confirm_delete_one}?"
                 )
-                st.session_state.favorites.remove(
-                    st.session_state.confirm_delete_one
-                )
-                st.session_state.confirm_delete_one = None
+                y, n = st.columns(2)
+
+                if y.button("Sí, eliminar"):
+                    persist_remove_favorite(
+                        st.session_state.username,
+                        st.session_state.confirm_delete_one
+                    )
+                    st.session_state.favorites.remove(
+                        st.session_state.confirm_delete_one
+                    )
+                    st.session_state.confirm_delete_one = None
+                    st.rerun()
+
+                if n.button("Cancelar"):
+                    st.session_state.confirm_delete_one = None
+
+            st.divider()
+
+            # --- acciones globales ---
+            if st.button("🧹 Eliminar todos"):
+                persist_clear_favorites(st.session_state.username)
+                st.session_state.favorites = []
+                st.session_state.selected_ticker = None
                 st.rerun()
-            if c2.button("Cancelar"):
-                st.session_state.confirm_delete_one = None
 
-        if st.button("🧹 Eliminar todos"):
-            persist_clear_favorites(st.session_state.username)
-            st.session_state.favorites = []
-            st.session_state.selected_ticker = None
-            st.rerun()
+            csv = pd.DataFrame(
+                st.session_state.favorites,
+                columns=["Ticker"]
+            ).to_csv(index=False)
 
-        st.divider()
+            st.download_button(
+                "⬇ Exportar favoritos",
+                csv,
+                "favoritos.csv"
+            )
 
-        # ---------- BUSCAR EMPRESA ----------
+        else:
+            st.caption("No tenés favoritos todavía")
+
+              # ---------- BUSCAR EMPRESA ----------
         st.subheader("🔍 Buscar empresa")
         company = st.selectbox("Empresa", [""] + list(STOCK_TICKERS.keys()))
         if company:
@@ -214,6 +238,30 @@ def show_dashboard():
         return
 
     ticker = st.session_state.selected_ticker
+
+    # ---------- FAVORITO (TOGGLE) ----------
+    is_fav = ticker in st.session_state.favorites
+
+    fav_label = (
+        "⭐ Quitar de favoritos"
+        if is_fav
+        else "⭐ Agregar a favoritos"
+    )
+
+    if st.button(fav_label):
+        if is_fav:
+            persist_remove_favorite(
+                st.session_state.username, ticker
+            )
+            st.session_state.favorites.remove(ticker)
+        else:
+            persist_add_favorite(
+                st.session_state.username, ticker
+            )
+            st.session_state.favorites.append(ticker)
+
+        st.rerun()
+
 
     # ---------- FLAGS ----------
     for f in ASSET_FLAGS.get(ticker, []):
@@ -319,25 +367,186 @@ def show_dashboard():
             st.session_state.selected_ticker = df_rank.iloc[sel[0]]["Ticker"]
             st.rerun()
 
-        # ---------- COMPARACIÓN ----------
+        # ---------- COMPARACIÓN RÁPIDA ----------
         st.subheader("🔀 Comparación rápida")
+
         tickers = df_rank["Ticker"].tolist()
-        t1, t2 = st.selectbox("A", tickers), st.selectbox("B", tickers, index=1)
-        if st.button("Comparar"):
-            st.bar_chart({
-                t1: st.session_state.scores[t1],
-                t2: st.session_state.scores[t2]
+
+        c1, c2 = st.columns(2)
+
+        t1 = c1.selectbox("Activo A", tickers, key="cmp_a")
+        t2 = c2.selectbox(
+            "Activo B",
+            tickers,
+            index=1 if len(tickers) > 1 else 0,
+            key="cmp_b"
+        )
+
+        if t1 and t2:
+            score_a = st.session_state.scores.get(t1, 0)
+            score_b = st.session_state.scores.get(t2, 0)
+
+            risk_a = risk_score(t1)
+            risk_b = risk_score(t2)
+
+            balance_a = score_a - risk_a * 0.5
+            balance_b = score_b - risk_b * 0.5
+
+            # --- gráfico ---
+            st.bar_chart(
+                {
+                    t1: score_a,
+                    t2: score_b
+                }
+            )
+
+            # --- métricas ---
+            compare_df = pd.DataFrame({
+                "Métrica": [
+                    "Score",
+                    "Riesgo",
+                    "Balance",
+                    "Estado mercado",
+                    "Tipo de activo"
+                ],
+                t1: [
+                    score_a,
+                    risk_a,
+                    round(balance_a, 2),
+                    market_status(t1),
+                    "Cripto" if t1.endswith(".CRYPTO") else "Acción / ETF"
+                ],
+                t2: [
+                    score_b,
+                    risk_b,
+                    round(balance_b, 2),
+                    market_status(t2),
+                    "Cripto" if t2.endswith(".CRYPTO") else "Acción / ETF"
+                ]
             })
 
-        # ---------- RECOMENDADO ----------
-        best = df_rank.iloc[0]["Ticker"]
+            st.table(compare_df)
+        # ================= RECOMENDADO PARA VOS =================
         st.subheader("🧠 Recomendado para vos")
-        if st.button(f"👉 Ver {best}"):
-            st.session_state.selected_ticker = best
-            st.rerun()
 
-    else:
-        st.caption("Agregá favoritos para ver ranking")
+        if st.session_state.favorites and not df_rank.empty:
+
+            # excluir el activo actual
+            candidates = df_rank[
+                df_rank["Ticker"] != st.session_state.selected_ticker
+            ]
+
+            if not candidates.empty:
+                rec = candidates.sort_values(
+                    "Balance", ascending=False
+                ).iloc[0]
+
+                st.markdown(
+                    f"""
+        **👉 {rec['Ticker']}**
+
+        Mejor balance riesgo / retorno según tus favoritos.
+
+        - **Score:** {rec['Score']}
+        - **Riesgo:** {rec['Riesgo']}
+        - **Balance:** {round(rec['Balance'], 2)}
+        """
+                )
+
+                if st.button("Ver activo recomendado"):
+                    st.session_state.selected_ticker = rec["Ticker"]
+                    st.rerun()
+
+            else:
+                st.caption(
+                    "Ya estás viendo el activo con mejor balance de tu ranking."
+                )
+
+        else:
+            st.caption(
+                "Agregá activos a favoritos para recibir recomendaciones personalizadas."
+            )
+
+    if ENABLE_ETF_FINDER:
+    
+        # ================= ETF FINDER =================
+        st.subheader("🧭 ETF Finder")
+
+        ETF_TYPES = {
+            "Indexados": ["Mercado amplio", "S&P 500", "Nasdaq"],
+            "Temáticos": [
+                "Technology", "Artificial Intelligence",
+                "Fintech", "Energy", "Healthcare", "Space"
+            ],
+            "Sectoriales": [
+                "Technology", "Energy", "Healthcare", "Financials"
+            ],
+            "Apalancados": [
+                "Bull x2", "Bull x3", "Bear x2", "Bear x3"
+            ],
+            "Inversos": [
+                "Mercado", "S&P 500", "Nasdaq"
+            ]
+        }
+
+        ETF_CATALOG = {
+            ("Indexados", "Mercado amplio"): ["VTI", "VT"],
+            ("Indexados", "S&P 500"): ["SPY", "IVV"],
+            ("Indexados", "Nasdaq"): ["QQQ"],
+
+            ("Temáticos", "Technology"): ["XLK"],
+            ("Temáticos", "Artificial Intelligence"): ["BOTZ", "AIQ"],
+            ("Temáticos", "Fintech"): ["FINX"],
+            ("Temáticos", "Energy"): ["ICLN", "XLE"],
+            ("Temáticos", "Healthcare"): ["XLV"],
+            ("Temáticos", "Space"): ["ARKX"],
+
+            ("Sectoriales", "Technology"): ["XLK"],
+            ("Sectoriales", "Energy"): ["XLE"],
+            ("Sectoriales", "Healthcare"): ["XLV"],
+
+            ("Apalancados", "Bull x2"): ["SSO"],
+            ("Apalancados", "Bull x3"): ["UPRO"],
+            ("Apalancados", "Bear x2"): ["SDS"],
+            ("Apalancados", "Bear x3"): ["SPXU"],
+
+            ("Inversos", "Mercado"): ["SH"],
+            ("Inversos", "S&P 500"): ["SH"],
+            ("Inversos", "Nasdaq"): ["PSQ"],
+        }
+
+        c1, c2 = st.columns(2)
+
+        etf_type = c1.selectbox(
+            "Tipo de ETF",
+            [""] + list(ETF_TYPES.keys())
+        )
+
+        theme = None
+        if etf_type:
+            theme = c2.selectbox(
+                "Tema / Industria",
+                [""] + ETF_TYPES[etf_type]
+            )
+
+        if etf_type and theme:
+            etfs = ETF_CATALOG.get((etf_type, theme), [])
+
+            if etfs:
+                st.markdown("**ETFs disponibles:**")
+
+                for etf in etfs:
+                    col1, col2 = st.columns([6, 2])
+                    col1.write(f"📈 {etf}")
+
+                    if col2.button(
+                        "Ver ETF",
+                        key=f"etf_{etf}"
+                    ):
+                        st.session_state.selected_ticker = etf
+                        st.rerun()
+            else:
+                st.caption("No hay ETFs para esta combinación")
 
     st.caption("Modo DEMO — arquitectura lista para datos reales")
 
