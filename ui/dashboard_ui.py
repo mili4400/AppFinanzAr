@@ -196,7 +196,6 @@ def show_dashboard():
             st.write(market_status(st.session_state.selected_ticker))
         else:
             st.caption("Sin activo seleccionado")
-
     
         # ---------- FAVORITOS ----------
         st.subheader("⭐ Favoritos")
@@ -313,6 +312,7 @@ def show_dashboard():
         return
 
     ticker = st.session_state.selected_ticker
+    
     # ---------- FLAGS ----------
     for f in ASSET_FLAGS.get(ticker, []):
         st.warning(f)
@@ -364,6 +364,24 @@ def show_dashboard():
     fig.add_scatter(x=df["date"], y=df["EMA20"], name="EMA 20")
 
     st.plotly_chart(fig, use_container_width=True)
+
+    # ================= ALERTAS =================
+    if ticker in PRICE_ALERTS:
+        msg, _ = PRICE_ALERTS[ticker]
+        st.warning(msg)
+
+    smart = SMART_ALERTS.get(ticker, {})
+    if smart:
+        st.markdown("### 🧠 Alertas inteligentes")
+        if smart.get("pump"):
+            st.error("🔥 Pump detectado")
+        if smart.get("rapid_move"):
+            st.warning("⏱️ Movimiento brusco")
+        if smart.get("volatility", 0) > 10:
+            st.warning(f"🌪️ Volatilidad {smart['volatility']}%")
+
+    # ================= RIESGO =================
+    st.metric("⚠️ Riesgo", f"{risk_score(ticker)}/100")
 
     
     # ---------- FAVORITO (TOGGLE) ----------
