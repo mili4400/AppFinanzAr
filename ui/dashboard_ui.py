@@ -29,6 +29,11 @@ CRYPTO_TICKERS = {
     "Solana": "SOL.CRYPTO"
 }
 
+ETF_TICKERS = {
+    "Tech ETF": "ETF.TECH",
+    "Global ETF": "ETF.GLOBAL",
+    "AI ETF": "ETF.AI"
+}
 ETF_THEMES = [
     "Technology", "Energy", "Healthcare",
     "Artificial Intelligence", "Fintech", "Space"
@@ -119,8 +124,9 @@ def init_state():
         st.session_state.selected_ticker = None
 
     if "favorites" not in st.session_state:
-        st.session_state.favorites = load_favorites(st.session_state.username)
-
+        favs = load_favorites(st.session_state.username)
+        st.session_state.favorites = favs if isinstance(favs, list) else []
+        
     if "scores" not in st.session_state:
         st.session_state.scores = {}
 
@@ -149,13 +155,47 @@ def show_dashboard():
 
     # ================= SIDEBAR =================
     with st.sidebar:
+        st.subheader("🔍 Buscar activo")
+
+        tab_emp, tab_crypto, tab_etf = st.tabs(["Empresa", "Cripto", "ETF"])
+
+        with tab_emp:
+            company = st.selectbox(
+                "Empresa",
+                [""] + list(STOCK_TICKERS.keys())
+            )
+            if company:
+                if st.button("Seleccionar empresa"):
+                    st.session_state.selected_ticker = STOCK_TICKERS[company]
+                    st.rerun()
+
+        with tab_crypto:
+            crypto = st.selectbox(
+                "Criptomoneda",
+                [""] + list(CRYPTO_TICKERS.keys())
+            )
+            if crypto:
+                if st.button("Seleccionar cripto"):
+                    st.session_state.selected_ticker = CRYPTO_TICKERS[crypto]
+                    st.rerun()
+
+        with tab_etf:
+            etf = st.selectbox(
+                "ETF",
+                [""] + list(ETF_TICKERS.keys())
+            )
+            if etf:
+                if st.button("Seleccionar ETF"):
+                    st.session_state.selected_ticker = ETF_TICKERS[etf]
+                    st.rerun()
+
+        st.divider()
+
         st.subheader("🕒 Estado del mercado")
         if st.session_state.selected_ticker:
             st.write(market_status(st.session_state.selected_ticker))
         else:
-            st.caption("Seleccioná un activo")
-
-        st.divider()
+            st.caption("Sin activo seleccionado")
 
     
         # ---------- FAVORITOS ----------
@@ -233,12 +273,99 @@ def show_dashboard():
                 st.session_state.selected_ticker = CRYPTO_TICKERS[crypto]
 
     # ================= MAIN =================
+    # ---------- SELECTOR PRINCIPAL ----------
+    st.subheader("🎯 Seleccionar activo")
+
+    selector_options = (
+        [""] +
+        [f"📈 {v}" for v in STOCK_TICKERS.values()] +
+        ["— CRIPTO —"] +
+        [f"🟣 {v}" for v in CRYPTO_TICKERS.values()] +
+        ["— ETF —"] +
+        [f"🧭 {v}" for v in ETF_TICKERS.values()]
+    )
+
+    current = st.session_state.selected_ticker
+    current_label = ""
+    if current:
+        if current.endswith(".CRYPTO"):
+            current_label = f"🟣 {current}"
+        elif current.startswith("ETF"):
+            current_label = f"🧭 {current}"
+        else:
+            current_label = f"📈 {current}"
+
+    selected = st.selectbox(
+        "Activo",
+        selector_options,
+        index=selector_options.index(current_label) if current_label in selector_options else 0,
+        label_visibility="collapsed"
+    )
+
+    if selected and not selected.startswith("—"):
+        clean = selected.replace("📈 ", "").replace("🟣 ", "").replace("🧭 ", "")
+        if clean != st.session_state.selected_ticker:
+            st.session_state.selected_ticker = clean
+            st.rerun()
+
     if not st.session_state.selected_ticker:
-        st.info("👈 Seleccioná un activo")
+        st.info("Seleccioná un activo para comenzar")
         return
 
     ticker = st.session_state.selected_ticker
+    # ---------- FLAGS ----------
+    for f in ASSET_FLAGS.get(ticker, []):
+        st.warning(f)
 
+    # ---------- RANGO TEMPORAL ----------
+    st.subheader("📅 Rango temporal")
+
+    tf_map = {
+        "Semanal": 7,
+        "Quincenal": 15,
+        "Mensual": 30,
+        "Trimestral": 90,
+        "Anual": 365
+    }
+
+    tf = st.selectbox(
+        "Periodo",
+        list(tf_map.keys()),
+        index=list(tf_map.keys()).index(st.session_state.timeframe)
+    )
+
+    if tf != st.session_state.timeframe:
+        st.session_state.timeframe = tf
+        st.session_state.start_date = date.today() - timedelta(days=tf_map[tf])
+        st.session_state.end_date = date.today()
+
+    with st.expander("📅 Rango personalizado"):
+        c1, c2 = st.columns(2)
+        st.session_state.start_date = c1.date_input("Desde", st.session_state.start_date)
+        st.session_state.end_date = c2.date_input("Hasta", st.session_state.end_date)
+
+    if st.session_state.end_date <= st.session_state.start_date:
+        st.error("Rango de fechas inválido")
+        return
+
+    # ---------- GRÁFICO ----------
+    df = demo_ohlc(st.session_state.start_date, st.session_state.end_date)
+
+    fig = go.Figure()
+    fig.add_candlestick(
+        x=df["date"],
+        open=df["open"],
+        high=df["high"],
+        low=df["low"],
+        close=df["close"],
+        name="Precio"
+    )
+    fig.add_scatter(x=df["date"], y=df["SMA20"], name="SMA 20")
+    fig.add_scatter(x=df["date"], y=df["EMA20"], name="EMA 20")
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    
     # ---------- FAVORITO (TOGGLE) ----------
     is_fav = ticker in st.session_state.favorites
 
@@ -262,63 +389,6 @@ def show_dashboard():
 
         st.rerun()
 
-
-    # ---------- FLAGS ----------
-    for f in ASSET_FLAGS.get(ticker, []):
-        st.warning(f)
-
-    # ---------- RANGO TEMPORAL ----------
-    st.subheader("📅 Rango temporal")
-    today = date.today()
-
-    if "start_date" not in st.session_state:
-        st.session_state.start_date = today - timedelta(days=90)
-    if "end_date" not in st.session_state:
-        st.session_state.end_date = today
-
-    ranges = {
-        "1M": 30, "3M": 90, "6M": 180, "1Y": 365
-    }
-
-    cols = st.columns(len(ranges) + 1)
-    for i, (label, days) in enumerate(ranges.items()):
-        if cols[i].button(label):
-            st.session_state.start_date = today - timedelta(days=days)
-            st.session_state.end_date = today
-
-    if cols[-1].button("📅"):
-        c1, c2 = st.columns(2)
-        st.session_state.start_date = c1.date_input(
-            "Desde", st.session_state.start_date
-        )
-        st.session_state.end_date = c2.date_input(
-            "Hasta", st.session_state.end_date
-        )
-
-    df = demo_ohlc(st.session_state.start_date, st.session_state.end_date)
-
-    fig = go.Figure()
-    fig.add_candlestick(
-        x=df["date"],
-        open=df["open"],
-        high=df["high"],
-        low=df["low"],
-        close=df["close"]
-    )
-    fig.add_scatter(x=df["date"], y=df["SMA20"], name="SMA 20")
-    fig.add_scatter(x=df["date"], y=df["EMA20"], name="EMA 20")
-    st.plotly_chart(fig, use_container_width=True)
-
-    # ---------- FAVORITO ----------
-    if st.button("⭐ Agregar a favoritos"):
-        if ticker not in st.session_state.favorites:
-            persist_add_favorite(st.session_state.username, ticker)
-            st.session_state.favorites.append(ticker)
-
-        if ticker not in st.session_state.scores:
-            st.session_state.scores[ticker] = round(
-                np.random.uniform(40, 90), 2
-            )
 
     # ---------- OVERVIEW ----------
     ov = demo_overview(ticker)
@@ -466,6 +536,9 @@ def show_dashboard():
             st.caption(
                 "Agregá activos a favoritos para recibir recomendaciones personalizadas."
             )
+            
+        st.divider()
+
 
     if ENABLE_ETF_FINDER:
     
