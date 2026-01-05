@@ -306,6 +306,12 @@ def show_dashboard():
     if "timeframe" not in st.session_state:
         st.session_state.timeframe = "Mensual"
 
+    if "start_date" not in st.session_state:
+        st.session_state.start_date = date.today() - timedelta(days=30)
+
+    if "end_date" not in st.session_state:
+        st.session_state.end_date = date.today()
+
     # ---------- RANGO TEMPORAL ----------
     st.subheader("📅 Rango temporal")
 
@@ -316,29 +322,31 @@ def show_dashboard():
         "Trimestral": 90,
         "Anual": 365
     }
-    # init defensivo
-    if "timeframe" not in st.session_state:
-        st.session_state.timeframe = "Mensual"
-        
+
     timeframe_label = st.selectbox(
         "Periodo",
         list(tf_map.keys()),
         index=list(tf_map.keys()).index(st.session_state.timeframe)
     )
 
-    if tf != st.session_state.timeframe:
-        st.session_state.timeframe = timeframe_label
-        st.session_state.start_date = date.today() - timedelta(days=tf_map[tf])
-        st.session_state.end_date = date.today()
+    # asignación directa (FORMA CORRECTA)
+    st.session_state.timeframe = timeframe_label
+    st.session_state.start_date = date.today() - timedelta(
+        days=tf_map[timeframe_label]
+    )
+    st.session_state.end_date = date.today()
 
+    # ---------- RANGO PERSONALIZADO ----------
     with st.expander("📅 Rango personalizado"):
         c1, c2 = st.columns(2)
-        st.session_state.start_date = c1.date_input("Desde", st.session_state.start_date)
-        st.session_state.end_date = c2.date_input("Hasta", st.session_state.end_date)
+        start = c1.date_input("Desde", st.session_state.start_date)
+        end = c2.date_input("Hasta", st.session_state.end_date)
 
-    if st.session_state.end_date <= st.session_state.start_date:
-        st.error("Rango de fechas inválido")
-        return
+        if end > start:
+            st.session_state.start_date = start
+            st.session_state.end_date = end
+        else:
+            st.error("Rango de fechas inválido")
 
     # ---------- GRÁFICO ----------
     df = demo_ohlc(st.session_state.start_date, st.session_state.end_date)
