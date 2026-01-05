@@ -204,12 +204,16 @@ def show_dashboard():
             for f in st.session_state.favorites:
                 c1, c2 = st.columns([8, 1])
 
-                if c1.button(f, key=f"fav_nav_{f}"):
-                    st.session_state.selected_ticker = f
-                    st.rerun()
+                with c1:
+                    if st.button(f, key=f"fav_nav_{f}"):
+                        st.session_state.selected_ticker = f
+                        st.rerun()
 
-                if c2.button("❌", key=f"fav_del_{f}"):
-                    st.session_state.confirm_delete_one = f
+                with c2:
+                    cc1, cc2, cc3 = st.columns([1, 2, 1])
+                    with cc2:
+                        if st.button("❌", key=f"fav_del_{f}"):
+                            st.session_state.confirm_delete_one = f
 
             # --- confirmación eliminar uno ---
             if st.session_state.confirm_delete_one:
