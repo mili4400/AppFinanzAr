@@ -302,6 +302,10 @@ def show_dashboard():
     for f in ASSET_FLAGS.get(ticker, []):
         st.warning(f)
 
+    # ---------- INIT TIMEFRAME ----------
+    if "timeframe" not in st.session_state:
+        st.session_state.timeframe = "Mensual"
+
     # ---------- RANGO TEMPORAL ----------
     st.subheader("📅 Rango temporal")
 
@@ -312,15 +316,18 @@ def show_dashboard():
         "Trimestral": 90,
         "Anual": 365
     }
-
-    tf = st.selectbox(
+    # init defensivo
+    if "timeframe" not in st.session_state:
+        st.session_state.timeframe = "Mensual"
+        
+    timeframe_label = st.selectbox(
         "Periodo",
         list(tf_map.keys()),
         index=list(tf_map.keys()).index(st.session_state.timeframe)
     )
 
     if tf != st.session_state.timeframe:
-        st.session_state.timeframe = tf
+        st.session_state.timeframe = timeframe_label
         st.session_state.start_date = date.today() - timedelta(days=tf_map[tf])
         st.session_state.end_date = date.today()
 
