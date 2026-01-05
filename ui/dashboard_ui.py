@@ -259,6 +259,14 @@ def show_dashboard():
             
 
     # ================= MAIN =================
+
+    # -----------------------------
+    # SELECTOR DE IDIOMA
+    # -----------------------------
+    lang = st.sidebar.selectbox("Idioma / Language", ["Español", "English"])
+    lang_code = "es" if lang == "Español" else "en"
+
+
     # ---------- SELECTOR PRINCIPAL ----------
     st.subheader("🎯 Seleccionar activo")
 
@@ -414,6 +422,16 @@ def show_dashboard():
     ov = demo_overview(ticker)
     st.subheader("📋 Resumen ejecutivo")
     st.json(ov["executive"])
+
+    # Competidores
+    st.subheader("🏦 Competidores Reales (Industria / Sector / País)")
+    competitors = overview.get("competitors", [])[:5]  # limitar a 5
+    if competitors:
+        st.write(", ".join(competitors))
+    else:
+        st.info("No se encontraron competidores.")
+
+    # Noticias + sentimiento
 
     st.subheader("📰 Noticias & Sentimiento")
     for n in ov["news"]:
