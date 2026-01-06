@@ -425,7 +425,8 @@ def show_dashboard():
 
     # Competidores
     st.subheader("🏦 Competidores Reales (Industria / Sector / País)")
-    competitors = overview.get("competitors", [])[:5]  # limitar a 5
+    
+    competitors = ov.get("competitors", [])[:5]  # limitar a 5
     if competitors:
         st.write(", ".join(competitors))
     else:
