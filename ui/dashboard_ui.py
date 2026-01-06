@@ -91,12 +91,76 @@ def risk_score(t):
         score += 20
     return min(score, 100)
 
+# -----------------------------
+# DEMO ASSET METADATA
+# -----------------------------
+ASSET_METADATA = {
+    "MSFT.US": {
+        "name": "Microsoft Corporation",
+        "exchange": "NASDAQ",
+        "country": "United States",
+        "sector": "Technology"
+    },
+    "AAPL.US": {
+        "name": "Apple Inc.",
+        "exchange": "NASDAQ",
+        "country": "United States",
+        "sector": "Technology"
+    },
+    "GOOGL.US": {
+        "name": "Alphabet Inc.",
+        "exchange": "NASDAQ",
+        "country": "United States",
+        "sector": "Technology"
+    },
+    "AMZN.US": {
+        "name": "Amazon.com Inc.",
+        "exchange": "NASDAQ",
+        "country": "United States",
+        "sector": "Consumer Discretionary"
+    },
+    "GGAL.BA": {
+        "name": "Grupo Financiero Galicia",
+        "exchange": "BYMA",
+        "country": "Argentina",
+        "sector": "Financials"
+    },
+    "BTC.CRYPTO": {
+        "name": "Bitcoin",
+        "exchange": "Crypto Market",
+        "country": "Global",
+        "sector": "Cryptocurrency"
+    },
+    "ETH.CRYPTO": {
+        "name": "Ethereum",
+        "exchange": "Crypto Market",
+        "country": "Global",
+        "sector": "Cryptocurrency"
+    }
+}
 
+# -----------------------------
+# DEMO OVERVIEW
+# -----------------------------
 def demo_overview(t):
+
+    meta = ASSET_METADATA.get(
+        t,
+        {
+            "name": t,
+            "exchange": "N/A",
+            "country": "N/A",
+            "sector": "N/A"
+        }
+    )
+
     return {
         "executive": {
             "Ticker": t,
-            "Sector": "Technology",
+            "Name": meta["name"],
+            "Exchange": meta["exchange"],
+            "Country": meta["country"],
+            "Sector": meta["sector"],
             "Score Global": round(np.random.uniform(40, 90), 2)
         },
         "fundamentals": {
